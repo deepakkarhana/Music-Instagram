@@ -57,8 +57,8 @@ learning project rather than a wiring job.
 
 | Week | Milestone | Status |
 |:----:|-----------|:------:|
-| 1 | Build the song catalog | 🟡 in progress |
-| 2 | Turn every song into an embedding, build the search index | ⬜ |
+| 1 | Build the song catalog | ✅ done |
+| 2 | Turn every song into an embedding, build the search index | 🟡 in progress |
 | 3 | Define the "vibe" vocabulary, collect photos | ⬜ |
 | 4 | Teach a vision model to describe a photo's vibe | ⬜ |
 | 5 | **First working demo** — upload a photo, get songs | ⬜ |
@@ -91,13 +91,37 @@ python scripts/01_harvest_itunes.py
 
 Safe to stop with `Ctrl+C` at any point — rerunning resumes where it left off.
 
+### Then make it searchable
+
+This part needs a few libraries:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+```bash
+python scripts/03_embed_catalog.py --quick   # 60 songs, proves it works
+python scripts/03_embed_catalog.py           # the real run — slow, resumable
+python scripts/04_build_index.py             # pack them into a search index
+python scripts/05_search.py                  # search with a sentence
+```
+
+Then ask it for something:
+
+```bash
+python scripts/05_search.py "rainy café window, quiet piano, soft melancholy"
+```
+
+No photo involved yet — that arrives in Week 5. This is the step that proves
+words can retrieve music, which is the assumption everything else rests on.
+
 ---
 
 ## Where the songs come from
 
 | Source | What it gives us | Cost |
 |--------|------------------|------|
-| **iTunes Search API** | 30-second preview MP3s, plus artist/genre/year. Excellent Hindi, Punjabi and English coverage | Free, no key |
+| **iTunes Search API** | 30-second `.m4a` previews, plus artist/genre/year. Excellent Hindi, Punjabi and English coverage | Free, no key |
 | **Deezer API** | More previews, fills gaps iTunes misses | Free, no key |
 | **MTG-Jamendo** | ~55k Creative Commons tracks with mood tags — our training set | Free |
 | **Last.fm** | Crowd tags like *romantic*, *gym*, *monsoon*, *90s* | Free key |

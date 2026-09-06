@@ -1,0 +1,25 @@
+# Week 1 (harvesting) needs none of this - it runs on the standard library.
+# These are for Week 2 onwards.
+#
+#   python -m pip install -r requirements.txt
+#
+# On a laptop this installs the CPU build of PyTorch, which is what you want.
+# Google Colab already has torch installed with GPU support - there you only
+# need transformers, faiss-cpu and av.
+
+torch>=2.4
+transformers>=4.44
+numpy>=1.26
+
+# Decoding audio. iTunes previews are .m4a (AAC) despite being widely
+# described as MP3, and most Python audio libraries cannot read AAC.
+# PyAV wraps FFmpeg and ships its decoders inside the wheel, so there is
+# nothing to install separately and no PATH to configure.
+av>=12.0
+
+# librosa is not needed for decoding (PyAV resamples for us). It arrives in
+# Week 10, for tempo and energy features used by the reranker.
+librosa>=0.10
+
+# The search index.
+faiss-cpu>=1.8

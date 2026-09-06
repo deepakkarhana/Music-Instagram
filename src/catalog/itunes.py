@@ -9,7 +9,7 @@ We need two things that are hard to get together for free:
 
 The iTunes Search API gives us both, needs **no API key and no signup**, and
 covers the Indian catalog very well. Each result includes a `previewUrl` -
-a 30-second MP3. Thirty seconds is plenty: it is usually the chorus, which is
+a 30-second `.m4a` clip. Thirty seconds is plenty: it is usually the chorus,
 exactly the part someone would put on a story.
 
 WHAT WE DO WITH THE AUDIO
