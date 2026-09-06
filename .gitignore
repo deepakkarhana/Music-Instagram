@@ -1,0 +1,33 @@
+# ---- Data (NEVER commit these) ----------------------------------
+# Audio files, embeddings and indexes are large and/or not ours to
+# redistribute. The repo ships code only. See docs/00-how-this-works.md
+# (data/README.md is the one exception, so the folder exists on a fresh clone;
+# the scripts create data/raw/ and data/interim/ themselves when they run.)
+data/*
+!data/README.md
+*.npy
+*.npz
+*.faiss
+*.mp3
+*.wav
+*.parquet
+
+# ---- Secrets -----------------------------------------------------
+.env
+*.key
+
+# ---- Python ------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- OS / editor -------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
