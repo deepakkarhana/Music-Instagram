@@ -96,6 +96,8 @@ def main():
                         help="check how CLAP handles Indian music")
     parser.add_argument("--device", default=None, help="force 'cpu' or 'cuda'")
     parser.add_argument("--model", default=clap.MODEL_NAME, help="CLAP checkpoint to use")
+    parser.add_argument("--fp16", action="store_true",
+                        help="16-bit on GPU: ~2x faster, but untested - check your results")
     args = parser.parse_args()
 
     console.setup()
@@ -111,7 +113,7 @@ def main():
     print(f"Index: {index.ntotal:,} songs\n")
 
     print("Loading CLAP...")
-    model, processor, device = clap.load(args.model, device=args.device)
+    model, processor, device = clap.load(args.model, device=args.device, half=args.fp16)
     print(f"Running on {device.upper()}\n")
 
     def run(text, show_lane=False):

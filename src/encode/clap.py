@@ -87,14 +87,32 @@ def pick_device(preferred=None):
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def load(model_name=MODEL_NAME, device=None):
+def load(model_name=MODEL_NAME, device=None, half=False):
     """Download (first time) and load CLAP.
+
+    Parameters
+    ----------
+    half : bool
+        Use 16-bit precision on the GPU. Roughly doubles speed and halves
+        memory - but see the warning below. Off by default.
 
     Returns
     -------
     (model, processor, device)
         `model` does the thinking; `processor` converts raw waveforms and raw
         strings into the exact tensor format the model expects.
+
+    WHY HALF PRECISION IS OFF BY DEFAULT
+    ------------------------------------
+    16-bit floats hold far less detail than 32-bit ones. For most models that
+    is a free speed-up, but some produce NaNs or quietly lose accuracy, and we
+    have no GPU to test this on. A silent accuracy loss here would be
+    especially nasty: the embeddings would still look completely normal.
+
+    Full precision on a Colab T4 embeds the whole catalog in well under an
+    hour, which is fast enough. Speed is not worth an untested risk to the
+    numbers everything else is built on. Pass --fp16 if you want it and can
+    check the results.
     """
     import torch
     from transformers import ClapModel, ClapProcessor
@@ -108,9 +126,7 @@ def load(model_name=MODEL_NAME, device=None):
     # off dropout and similar training-only behaviour.
     model = model.to(device).eval()
 
-    # Half precision on GPU halves the memory and roughly doubles the speed.
-    # On CPU it is usually slower, so we only do it on CUDA.
-    if device == "cuda":
+    if half and device == "cuda":
         model = model.half()
 
     return model, processor, device
@@ -167,7 +183,10 @@ def embed_audio(model, processor, waveforms, device, sample_rate=48000):
         )
     inputs = {key: value.to(device) for key, value in inputs.items()}
 
-    if device == "cuda":
+    # Match the inputs to whatever precision the model is actually in, rather
+    # than assuming. Guessing here is how you get a dtype mismatch crash.
+    model_dtype = next(model.parameters()).dtype
+    if model_dtype == torch.float16:
         inputs = {
             key: value.half() if value.dtype == torch.float32 else value
             for key, value in inputs.items()

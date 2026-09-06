@@ -68,6 +68,8 @@ def main():
     parser.add_argument("--quick", action="store_true", help="just 60 songs, as a test")
     parser.add_argument("--device", default=None, help="force 'cpu' or 'cuda'")
     parser.add_argument("--model", default=clap.MODEL_NAME, help="CLAP checkpoint to use")
+    parser.add_argument("--fp16", action="store_true",
+                        help="16-bit on GPU: ~2x faster, but untested - check your results")
     parser.add_argument("--in-order", action="store_true",
                         help="embed in catalog order instead of shuffled")
     args = parser.parse_args()
@@ -115,7 +117,7 @@ def main():
 
     print(f"Loading CLAP ({args.model})...")
     print("The first run downloads about 600 MB. After that it is cached.\n")
-    model, processor, device = clap.load(args.model, device=args.device)
+    model, processor, device = clap.load(args.model, device=args.device, half=args.fp16)
 
     # Before spending hours on this, prove the model can actually tell two
     # different sentences apart. A checkpoint whose text encoder is dead
