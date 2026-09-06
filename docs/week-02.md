@@ -232,6 +232,94 @@ the project, and it belongs in the final report.
 
 ---
 
+## Results: what a 1,522-song index actually does
+
+Measured on 11.3% of the catalog (732 Indian / 828 English before dedup).
+
+### The language question, answered
+
+This was the open question Week 2 existed to settle. The index is **46.9%
+Indian-lane**, so that is the number to beat. Share of Indian-lane tracks in
+the top 5:
+
+| query phrasing | Indian-lane share | vs 46.9% baseline |
+|---|---|---|
+| "romantic love song, tender and emotional" | 40% | at baseline |
+| "romantic hindi bollywood love song..." | 60% | above |
+| "punjabi bhangra dance song with dhol..." | **100%** | far above |
+| "indian classical sitar and tabla..." | **100%** | far above |
+
+**CLAP hears Indian music.** A language-neutral query sits at chance; asking
+for Indian music reliably returns it. That is real signal from audio alone -
+the model has no access to the language field.
+
+**But read the results, not just the numbers.** The "punjabi" query returned
+A.R. Rahman (Tamil), *Dilbaro* (Hindi), Asha Bhosle and Jagjit Singh (Urdu
+ghazal), and exactly one actual Punjabi track. So:
+
+> CLAP separates **South Asian from Western** music reliably. It does **not**
+> separate Punjabi from Hindi from Tamil.
+
+That is precise enough to design against: use CLAP for the broad musical
+vibe, and use the metadata (`lane`, `seed_term`, artist) as a hard filter when
+the user wants a specific language. Do not ask the embedding to do a job it
+cannot do.
+
+### Describe the SOUND, not the SCENE
+
+The worst result was:
+
+```
+"high energy gym workout, aggressive hip hop with heavy bass"
+  1. Rainy Day          2. Bossa Nova       3. Beach Vibes
+```
+
+Two causes, both instructive.
+
+**First, "gym workout" has no sound.** CLAP only ever hears audio. A gym is a
+place, not a timbre. Rephrasing the same intent acoustically -
+*"aggressive rap, hard hitting drums, angry male rapper shouting"* - pulled up
+`GYM MOTIVATION` and ZZ Top instead.
+
+> This directly shapes Week 4. The vibe descriptor the vision model writes
+> must be in the language of **sound** - tempo, instruments, texture, vocal
+> style - not in the language of **scenes**. "Mountains at sunset" is useless
+> to CLAP; "airy acoustic guitar, slow, wide reverb" is not.
+
+**Second, the pool was weak.** Of 86 `Hip-Hop/Rap` tracks in the index, most
+are lo-fi: *Rest*, *Arise*, *Cyber*, *Rainy Day*, *Late Night Drive*. iTunes
+tags lo-fi beats as hip-hop, correctly. So the model returned the most
+hip-hop-sounding things available. The retrieval was not wrong; the catalog
+was thin, on 11% of it.
+
+### Duplicates were real, and titles could not catch them
+
+iTunes lists the same recording on the single, the album, and three
+compilations. Week 1 deduplicated by `track_id`, which misses this:
+
+```
+"Shayad"                        Pritam & Arijit Singh
+"Shayad (From \"Love Aaj Kal\")"  Pritam & Arijit Singh     cosine 0.9973
+```
+
+Different ids, different titles, identical audio. One artist has **42 rows**
+under a single lo-fi title.
+
+Because we already have an embedding of every song, we can deduplicate on what
+the songs *sound like* instead of what they are called - which catches
+re-releases and never merges two different songs that share a name. See
+`src/retrieve/dedup.py`. It removed 38 of 1,560 at cosine 0.98.
+
+### Hubness: present, but not the problem
+
+A "hub" is a vector close to everything, which crowds into every result list.
+Measured against 10 unrelated probes, mean similarity across the catalog was
+0.155 (std 0.047), the worst hub reached 0.304, and only one song appeared in
+more than one of the ten top-5 lists. Worth watching in Week 10's reranking,
+but it is not what broke the gym query.
+
+---
+
 ## How long this takes
 
 | Where | 13,497 songs |

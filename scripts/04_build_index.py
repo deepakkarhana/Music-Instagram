@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src import console
 from src.encode import clap
 from src.encode.store import VectorStore, read_catalog
+from src.retrieve import dedup as dedup_module
 from src.retrieve import index as index_module
 
 CATALOG_PATH = os.path.join("data", "raw", "itunes_catalog.csv")
@@ -34,6 +35,10 @@ def main():
     parser.add_argument("--catalog", default=CATALOG_PATH)
     parser.add_argument("--store", default=STORE_PATH)
     parser.add_argument("--out", default=INDEX_PATH, help="where to save the index")
+    parser.add_argument("--dedup-threshold", type=float, default=dedup_module.DEFAULT_THRESHOLD,
+                        help="cosine above which two tracks count as the same recording")
+    parser.add_argument("--no-dedup", action="store_true",
+                        help="keep duplicate recordings in the index")
     args = parser.parse_args()
 
     console.setup()
@@ -55,6 +60,17 @@ def main():
 
     lengths = np.linalg.norm(vectors, axis=1)
     print(f"Vector lengths: min {lengths.min():.4f}, max {lengths.max():.4f} (should be 1.0000)")
+
+    # Drop songs that are the same recording twice. iTunes lists a track on the
+    # single, the album and three compilations, so without this a search can
+    # return the same song five times.
+    if not args.no_dedup:
+        keep = dedup_module.find_keepers(vectors, threshold=args.dedup_threshold)
+        kept, dropped = dedup_module.summarise(keep)
+        print(f"Deduplication: dropped {dropped:,} duplicate recordings "
+              f"(cosine >= {args.dedup_threshold}), {kept:,} songs remain.")
+        vectors = vectors[keep]
+        track_ids = [t for t, k in zip(track_ids, keep) if k]
 
     index = index_module.build(vectors)
     index_module.save(index, track_ids, args.out)

@@ -165,8 +165,14 @@ Music-Instagram/
   that would sit behind such a feature.
 - **Previews are 30 seconds, not whole songs.** Usually the chorus, which is
   what a story uses anyway, but it is a real limitation and we say so.
-- **CLAP was trained mostly on English audio.** How well it handles Hindi and
-  Punjabi vocals is an open question we test in Week 2 rather than assume.
+- **CLAP separates South Asian from Western music, but not Punjabi from Hindi
+  from Tamil.** Measured in Week 2: asking for Indian music returns 100%
+  Indian-lane tracks against a 46.9% baseline, but a "punjabi" query returns
+  Tamil, Hindi and Urdu tracks too. So language is handled by metadata
+  filters, not by the embedding. See [docs/week-02.md](docs/week-02.md).
+- **Descriptions must be about sound, not scenery.** "Gym workout" means
+  nothing to a model that only hears audio; "hard hitting drums, shouted
+  vocals" does.
 
 ---
 
