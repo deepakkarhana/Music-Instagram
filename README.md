@@ -115,6 +115,11 @@ python scripts/05_search.py "rainy café window, quiet piano, soft melancholy"
 No photo involved yet — that arrives in Week 5. This is the step that proves
 words can retrieve music, which is the assumption everything else rests on.
 
+Embedding the full catalog takes about **4 hours on a laptop CPU** or
+**20 minutes on a free Colab T4** — see
+[`notebooks/week02_embed_catalog.ipynb`](notebooks/week02_embed_catalog.ipynb).
+Either way it is resumable: stop with `Ctrl+C` and rerun to continue.
+
 ---
 
 ## Where the songs come from

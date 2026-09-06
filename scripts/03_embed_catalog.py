@@ -22,10 +22,13 @@ USEFUL FLAGS
     --limit 2000     stop after this many new songs this run
     --batch 16       songs processed per batch (lower it if you run out of memory)
     --workers 6      parallel downloads (raise on fast wifi, lower if unstable)
+    --in-order       embed in catalog order (default is a fixed-seed shuffle,
+                     so stopping early still leaves a representative sample)
 """
 
 import argparse
 import os
+import random
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -65,6 +68,8 @@ def main():
     parser.add_argument("--quick", action="store_true", help="just 60 songs, as a test")
     parser.add_argument("--device", default=None, help="force 'cpu' or 'cuda'")
     parser.add_argument("--model", default=clap.MODEL_NAME, help="CLAP checkpoint to use")
+    parser.add_argument("--in-order", action="store_true",
+                        help="embed in catalog order instead of shuffled")
     args = parser.parse_args()
 
     console.setup()
@@ -76,6 +81,17 @@ def main():
 
     catalog = read_catalog(args.catalog)
     store = VectorStore(args.store, dim=clap.EMBED_DIM)
+
+    # Shuffle with a fixed seed, so that stopping early still leaves a
+    # *representative* sample rather than the first N rows.
+    #
+    # This matters more than it looks. The catalog is ordered by search term,
+    # so the first few thousand rows are all Indian-lane tracks. Embedding
+    # "the first 2000" would build an index that cannot answer an English
+    # query, and the demo would look broken for reasons that have nothing to
+    # do with the model. A fixed seed keeps runs reproducible and resumable.
+    if not args.in_order:
+        random.Random(20260906).shuffle(catalog)
 
     # Skip anything already embedded, and anything already known to be broken.
     skip = store.skip_ids()
