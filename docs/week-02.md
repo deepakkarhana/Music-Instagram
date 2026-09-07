@@ -232,22 +232,43 @@ the project, and it belongs in the final report.
 
 ---
 
-## Results: what a 1,522-song index actually does
+## Results: the full catalog
 
-Measured on 11.3% of the catalog (732 Indian / 828 English before dedup).
+Final index: **11,870 songs** — the whole 13,497-track catalog, minus 1,627
+duplicate recordings the audio-based dedup removed (12% of it was the same
+song listed more than once). 5,268 Indian-lane, 6,602 English-lane.
+
+Embedded on a free Colab T4. Numbers below are from the full index; the
+earlier 1,522-song figures are kept for comparison, because the difference
+between them is itself the result.
 
 ### The language question, answered
 
-This was the open question Week 2 existed to settle. The index is **46.9%
+This was the open question Week 2 existed to settle. The index is **44.4%
 Indian-lane**, so that is the number to beat. Share of Indian-lane tracks in
 the top 5:
 
-| query phrasing | Indian-lane share | vs 46.9% baseline |
+| query phrasing | 1,522-song index | full 11,870-song index |
 |---|---|---|
-| "romantic love song, tender and emotional" | 40% | at baseline |
-| "romantic hindi bollywood love song..." | 60% | above |
-| "punjabi bhangra dance song with dhol..." | **100%** | far above |
-| "indian classical sitar and tabla..." | **100%** | far above |
+| "romantic love song, tender and emotional" | 40% | **20%** (below baseline) |
+| "romantic hindi bollywood love song..." | 60% | **100%** |
+| "punjabi bhangra dance song with dhol..." | 100% | **100%** |
+| "indian classical sitar and tabla..." | 100% | **100%** |
+
+Scaling the catalog eightfold sharpened the effect in *both* directions. The
+language-neutral English query dropped from 40% to 20% — below the 44.4%
+baseline — while every Indian-specific query went to 100%. The model is
+discriminating more confidently, not just more often.
+
+The clearest evidence is what the instrumental query returns now. On the small
+index it gave Shreya Ghoshal vocals. On the full one it returns **Ravi Shankar**
+(*Friar Park*, *Sandhya Raga*), *Raga Kirwani (Sarod & Cello)*, and a sarod-cello
+duet by the Bangash family. Actual Indian classical instrumental music, found
+from audio alone with no access to any language or genre field.
+
+That is a genuine result, and it is worth stating plainly in the report: **the
+catalog size mattered as much as the model.** The same code on 11% of the data
+looked mediocre.
 
 **CLAP hears Indian music.** A language-neutral query sits at chance; asking
 for Indian music reliably returns it. That is real signal from audio alone -

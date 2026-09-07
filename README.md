@@ -58,8 +58,8 @@ learning project rather than a wiring job.
 | Week | Milestone | Status |
 |:----:|-----------|:------:|
 | 1 | Build the song catalog | ✅ done |
-| 2 | Turn every song into an embedding, build the search index | 🟡 in progress |
-| 3 | Define the "vibe" vocabulary, collect photos | ⬜ |
+| 2 | Turn every song into an embedding, build the search index | ✅ done |
+| 3 | Define the "vibe" vocabulary, collect photos | 🟡 next |
 | 4 | Teach a vision model to describe a photo's vibe | ⬜ |
 | 5 | **First working demo** — upload a photo, get songs | ⬜ |
 | 6 | Measure it properly against baselines | ⬜ |
@@ -166,10 +166,11 @@ Music-Instagram/
 - **Previews are 30 seconds, not whole songs.** Usually the chorus, which is
   what a story uses anyway, but it is a real limitation and we say so.
 - **CLAP separates South Asian from Western music, but not Punjabi from Hindi
-  from Tamil.** Measured in Week 2: asking for Indian music returns 100%
-  Indian-lane tracks against a 46.9% baseline, but a "punjabi" query returns
-  Tamil, Hindi and Urdu tracks too. So language is handled by metadata
-  filters, not by the embedding. See [docs/week-02.md](docs/week-02.md).
+  from Tamil.** Measured on all 11,870 indexed songs: Indian-specific queries
+  return 100% Indian-lane tracks against a 44.4% baseline, and asking for
+  sitar and tabla returns actual Ravi Shankar recordings. But a "punjabi"
+  query still returns Tamil, Hindi and Urdu tracks, so language is handled by
+  metadata filters, not by the embedding. See [docs/week-02.md](docs/week-02.md).
 - **Descriptions must be about sound, not scenery.** "Gym workout" means
   nothing to a model that only hears audio; "hard hitting drums, shouted
   vocals" does.
