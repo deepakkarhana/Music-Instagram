@@ -59,7 +59,7 @@ learning project rather than a wiring job.
 |:----:|-----------|:------:|
 | 1 | Build the song catalog | ✅ done |
 | 2 | Turn every song into an embedding, build the search index | ✅ done |
-| 3 | Define the "vibe" vocabulary, collect photos | 🟡 next |
+| 3 | Define the "vibe" vocabulary, collect photos | 🟡 in progress |
 | 4 | Teach a vision model to describe a photo's vibe | ⬜ |
 | 5 | **First working demo** — upload a photo, get songs | ⬜ |
 | 6 | Measure it properly against baselines | ⬜ |
@@ -114,6 +114,13 @@ python scripts/05_search.py "rainy café window, quiet piano, soft melancholy"
 
 No photo involved yet — that arrives in Week 5. This is the step that proves
 words can retrieve music, which is the assumption everything else rests on.
+
+### Then check the vocabulary holds up
+
+```bash
+python scripts/06_probe_vibes.py          # test all 40 vibes against the index
+python scripts/06_probe_vibes.py --full   # see what each one retrieves
+```
 
 Embedding the full catalog takes about **4 hours on a laptop CPU** or
 **20 minutes on a free Colab T4** — see
