@@ -131,7 +131,14 @@ class VectorStore:
         """Push everything to disk, so an abrupt kill loses nothing."""
         for handle in (self._vectors_handle, self._ids_handle, self._failed_handle):
             handle.flush()
-            os.fsync(handle.fileno())
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                # Some filesystems - notably Google Drive mounted inside Colab -
+                # do not support fsync and raise here. The flush above has
+                # already handed the bytes to the OS, which is the part that
+                # matters. Losing the run over a failed sync would be absurd.
+                pass
 
     def close(self):
         for handle in (self._vectors_handle, self._ids_handle, self._failed_handle):
@@ -147,6 +154,60 @@ class VectorStore:
             self.close()
         return False
 
+
+
+def mirror(base_path, mirror_dir):
+    """Copy the store to a second location, for filesystems you cannot append to.
+
+    WHY THIS EXISTS
+    ---------------
+    Colab throws away its entire disk when you disconnect. An hour of embedding
+    can vanish because a laptop lid closed - which is exactly what happened on
+    this project.
+
+    The obvious fix is to write straight to Google Drive. But Drive is a
+    network filesystem pretending to be a disk: thousands of small appends to
+    it are slow, and it does not support fsync.
+
+    So we append to the fast local disk as usual, and copy the finished files
+    to Drive every so often. A crash then costs only the work since the last
+    copy, and the copy is a couple of whole-file writes rather than thousands
+    of tiny ones.
+    """
+    import shutil
+
+    os.makedirs(mirror_dir, exist_ok=True)
+    copied = []
+    for path in (base_path + ".f32", base_path + "_ids.csv", base_path + "_failed.csv"):
+        if os.path.exists(path):
+            shutil.copy2(path, os.path.join(mirror_dir, os.path.basename(path)))
+            copied.append(os.path.basename(path))
+    return copied
+
+
+def restore_from_mirror(base_path, mirror_dir):
+    """Bring back a mirrored store, so a fresh machine resumes instead of restarting.
+
+    Only copies when there is nothing local to lose.
+    """
+    import shutil
+
+    if not os.path.isdir(mirror_dir):
+        return 0
+    if os.path.exists(base_path + "_ids.csv"):
+        return 0  # local work exists; never overwrite it
+
+    folder = os.path.dirname(base_path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+
+    restored = 0
+    for name in ("clap_audio.f32", "clap_audio_ids.csv", "clap_audio_failed.csv"):
+        source = os.path.join(mirror_dir, name)
+        if os.path.exists(source):
+            shutil.copy2(source, os.path.join(folder or ".", name))
+            restored += 1
+    return restored
 
 def read_catalog(csv_path):
     """Load the Week 1 catalog CSV into a list of dictionaries."""

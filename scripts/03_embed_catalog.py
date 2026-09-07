@@ -24,6 +24,9 @@ USEFUL FLAGS
     --workers 6      parallel downloads (raise on fast wifi, lower if unstable)
     --in-order       embed in catalog order (default is a fixed-seed shuffle,
                      so stopping early still leaves a representative sample)
+    --mirror PATH    copy results to PATH every 10 batches. Use this on Colab
+                     with a Google Drive folder - Colab deletes its own disk
+                     when you disconnect, and an hour of work goes with it
 """
 
 import argparse
@@ -39,6 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src import console
 from src.encode import audio as audio_module
 from src.encode import clap
+from src.encode import store as store_module
 from src.encode.store import VectorStore, read_catalog
 
 CATALOG_PATH = os.path.join("data", "raw", "itunes_catalog.csv")
@@ -82,6 +86,10 @@ def main():
     parser.add_argument("--quick", action="store_true", help="just 60 songs, as a test")
     parser.add_argument("--device", default=None, help="force 'cpu' or 'cuda'")
     parser.add_argument("--model", default=clap.MODEL_NAME, help="CLAP checkpoint to use")
+    parser.add_argument("--mirror", default=None,
+                        help="folder to copy results into periodically (e.g. Google Drive)")
+    parser.add_argument("--mirror-every", type=int, default=10,
+                        help="copy to --mirror after this many batches")
     parser.add_argument("--fp16", action="store_true",
                         help="16-bit on GPU: ~2x faster, but untested - check your results")
     parser.add_argument("--in-order", action="store_true",
@@ -94,6 +102,15 @@ def main():
         print(f"No catalog at {args.catalog}")
         print("Run this first:  python scripts/01_harvest_itunes.py")
         return 1
+
+    # If a previous run mirrored its work somewhere durable, bring it back
+    # before deciding what still needs doing. This is what makes a wiped Colab
+    # machine resume instead of starting over.
+    if args.mirror:
+        restored = store_module.restore_from_mirror(args.store, args.mirror)
+        if restored:
+            print(f"Restored {restored} files from {args.mirror}")
+            print()
 
     catalog = read_catalog(args.catalog)
     store = VectorStore(args.store, dim=clap.EMBED_DIM)
@@ -186,6 +203,12 @@ def main():
                         embedded += 1
 
                 writer.flush()
+
+                # Copy to durable storage every so often. Not every batch -
+                # these are whole-file copies, and Drive is slow.
+                batch_number = start // args.batch + 1
+                if args.mirror and batch_number % args.mirror_every == 0:
+                    store_module.mirror(args.store, args.mirror)
 
                 done = embedded + failed
                 elapsed = time.time() - started
