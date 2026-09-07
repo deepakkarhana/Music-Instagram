@@ -239,6 +239,71 @@ def embed_track(model, processor, wave, device, sample_rate=48000):
     averaged = per_window.mean(axis=0, keepdims=True)
     return _normalise(averaged)[0]
 
+def prepare_audio(processor, wave, sample_rate=48000):
+    """Do the CPU-side half of embedding one song: windows -> mel spectrograms.
+
+    WHY THIS IS SPLIT OUT
+    ---------------------
+    Turning a waveform into the mel spectrogram the model expects is pure
+    number-crunching on the CPU, and it is not cheap - measured at 0.19s per
+    song, against 0.12s to decode the audio in the first place.
+
+    Left inside the main loop it runs one song at a time while the GPU waits.
+    Pulled out here, it can run in the same worker threads that do the
+    downloading, so the CPU work overlaps instead of queueing. NumPy releases
+    the GIL during this kind of maths, so threads genuinely run at once.
+
+    Returns
+    -------
+    (inputs, window_count)
+        `inputs` is None when the audio was unusable.
+    """
+    from src.encode import audio as audio_module
+
+    chunks = audio_module.windows(wave, sample_rate=sample_rate)
+    if not chunks:
+        return None, 0
+
+    inputs = processor(audio=chunks, sampling_rate=sample_rate, return_tensors="pt")
+    return inputs, len(chunks)
+
+
+def embed_prepared(model, prepared, counts, device):
+    """Run the GPU half on features already extracted by `prepare_audio`.
+
+    `prepared` is a list of processor outputs, one per song; `counts` says how
+    many windows each contributed. They are merged into a single forward pass
+    and then split back apart per song.
+    """
+    import torch
+
+    if not prepared:
+        return []
+
+    keys = prepared[0].keys()
+    merged = {key: torch.cat([item[key] for item in prepared]) for key in keys}
+    merged = {key: value.to(device) for key, value in merged.items()}
+
+    model_dtype = next(model.parameters()).dtype
+    if model_dtype == torch.float16:
+        merged = {
+            key: value.half() if value.dtype == torch.float32 else value
+            for key, value in merged.items()
+        }
+
+    with torch.no_grad():
+        features = _as_tensor(model.get_audio_features(**merged))
+
+    per_window = _normalise(features.float().cpu().numpy())
+
+    vectors = []
+    position = 0
+    for count in counts:
+        averaged = per_window[position : position + count].mean(axis=0, keepdims=True)
+        vectors.append(_normalise(averaged)[0])
+        position += count
+    return vectors
+
 def embed_tracks(model, processor, waves, device, sample_rate=48000):
     """Embed several previews in ONE forward pass. Same maths as embed_track.
 
