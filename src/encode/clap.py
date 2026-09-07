@@ -239,6 +239,64 @@ def embed_track(model, processor, wave, device, sample_rate=48000):
     averaged = per_window.mean(axis=0, keepdims=True)
     return _normalise(averaged)[0]
 
+def embed_tracks(model, processor, waves, device, sample_rate=48000):
+    """Embed several previews in ONE forward pass. Same maths as embed_track.
+
+    WHY THIS EXISTS
+    ---------------
+    `embed_track` handles one song, which means one GPU call per song with
+    only 3 windows in it. A GPU is a machine for doing thousands of identical
+    sums at once - feeding it three at a time leaves it mostly idle waiting
+    for Python to hand it the next scrap of work.
+
+    Measured on a Colab T4: one song at a time ran at 2.3 songs/sec, only
+    2.5x a laptop CPU, which is absurd for a GPU. The fix is to gather the
+    windows from every song in the batch and send them together.
+
+    This is the single most common performance mistake in beginner ML code,
+    and it looks like nothing: the per-song version is correct, readable, and
+    slow. Correct and slow is easy to leave in place for weeks.
+
+    Parameters
+    ----------
+    waves : list[np.ndarray]
+        Decoded previews. Each becomes 1-3 windows depending on length, which
+        is why we track how many belong to each song.
+
+    Returns
+    -------
+    list
+        One (512,) vector per input wave, or None where the audio was unusable.
+        Same order as `waves`.
+    """
+    from src.encode import audio as audio_module
+
+    chunks = []
+    counts = []
+    for wave in waves:
+        windows = audio_module.windows(wave, sample_rate=sample_rate)
+        counts.append(len(windows))
+        chunks.extend(windows)
+
+    if not chunks:
+        return [None] * len(waves)
+
+    per_window = embed_audio(model, processor, chunks, device, sample_rate)
+
+    # Walk back through, taking each song's share of the windows and averaging
+    # them. `counts` is what makes this safe when songs differ in length.
+    vectors = []
+    position = 0
+    for count in counts:
+        if count == 0:
+            vectors.append(None)
+            continue
+        averaged = per_window[position : position + count].mean(axis=0, keepdims=True)
+        vectors.append(_normalise(averaged)[0])
+        position += count
+
+    return vectors
+
 # Sentences chosen to be about as different as music descriptions get.
 # If a model cannot tell these apart, it cannot tell anything apart.
 _SELF_TEST_PROMPTS = [

@@ -140,23 +140,33 @@ def main():
             for start in range(0, len(todo), args.batch):
                 batch = todo[start : start + args.batch]
 
-                # Download the whole batch in parallel, then embed it in one go.
-                for track, wave in pool.map(fetch_and_decode, batch):
-                    track_id = str(track["track_id"])
+                # Download the whole batch in parallel...
+                results = list(pool.map(fetch_and_decode, batch))
 
+                # ...record the dead links...
+                usable = []
+                for track, wave in results:
                     if wave is None:
-                        writer.append_failed(track_id)
+                        writer.append_failed(str(track["track_id"]))
                         failed += 1
-                        continue
+                    else:
+                        usable.append((track, wave))
 
-                    vector = clap.embed_track(model, processor, wave, device)
-                    if vector is None:
-                        writer.append_failed(track_id)
-                        failed += 1
-                        continue
-
-                    writer.append(track_id, vector)
-                    embedded += 1
+                # ...then embed everything that survived in ONE call. Sending
+                # the whole batch at once instead of one song at a time is
+                # what actually keeps a GPU busy.
+                if usable:
+                    vectors = clap.embed_tracks(
+                        model, processor, [w for _, w in usable], device
+                    )
+                    for (track, _), vector in zip(usable, vectors):
+                        track_id = str(track["track_id"])
+                        if vector is None:
+                            writer.append_failed(track_id)
+                            failed += 1
+                        else:
+                            writer.append(track_id, vector)
+                            embedded += 1
 
                 writer.flush()
 
