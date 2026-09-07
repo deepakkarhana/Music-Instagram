@@ -248,10 +248,14 @@ def prepare_audio(processor, wave, sample_rate=48000):
     number-crunching on the CPU, and it is not cheap - measured at 0.19s per
     song, against 0.12s to decode the audio in the first place.
 
-    Left inside the main loop it runs one song at a time while the GPU waits.
-    Pulled out here, it can run in the same worker threads that do the
-    downloading, so the CPU work overlaps instead of queueing. NumPy releases
-    the GIL during this kind of maths, so threads genuinely run at once.
+    It is split out so the CPU half and the GPU half are separable and can be
+    measured independently, which is how the numbers below were found.
+
+    DO NOT run this in a thread pool. It looks like NumPy maths that would
+    release the GIL, but Hugging Face's feature extractor runs Python-level
+    loops and holds the lock throughout. Measured on 8 songs: 1.27s serial
+    against 7.84s across 8 threads - six times slower, because the threads
+    only add contention. Parallelising it needs processes, not threads.
 
     Returns
     -------

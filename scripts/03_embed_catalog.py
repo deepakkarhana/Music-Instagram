@@ -45,24 +45,29 @@ CATALOG_PATH = os.path.join("data", "raw", "itunes_catalog.csv")
 STORE_PATH = os.path.join("data", "interim", "clap_audio")
 
 
-def fetch_decode_prepare(track, processor):
-    """Do every CPU step for one song, in a worker thread.
+def fetch_and_decode(track):
+    """Download one preview and decode it. Runs in a worker thread.
 
-    Download, decode, resample, window, and compute the mel spectrogram. All
-    of it releases Python's GIL - the network call while it waits, the
-    decoding and the maths because they happen in C - so these genuinely run
-    in parallel across threads.
+    Only these two steps belong in a thread. Downloading waits on the network
+    and decoding happens inside FFmpeg's C code, and both release Python's
+    global interpreter lock, so they genuinely overlap.
 
-    Only the GPU forward pass is left for the main thread, which is the point:
-    measured per song, the CPU work is 0.81s download + 0.12s decode + 0.19s
-    mel. Leaving the mel step on the main thread had it running one song at a
-    time while the GPU waited for it.
+    THE MEL STEP DOES NOT BELONG HERE, AND MEASURING SAID SO
+    --------------------------------------------------------
+    Computing the mel spectrogram was moved into this function on the
+    reasoning that it is "just NumPy maths, which releases the GIL". That was
+    wrong. Hugging Face's feature extractor runs Python-level loops, so it
+    holds the lock the whole time. Measured on 8 songs:
+
+        serial     1.27s
+        8 threads  7.84s      <- six times SLOWER
+
+    Threads cannot overlap work that holds the GIL; they only add contention.
+    Speeding this up needs separate *processes*, not threads - which is a
+    Week 10 problem, not a Week 2 one.
     """
     wave = audio_module.load(track["preview_url"])
-    if wave is None:
-        return track, None, 0
-    inputs, count = clap.prepare_audio(processor, wave)
-    return track, inputs, count
+    return track, wave
 
 
 def main():
@@ -149,17 +154,24 @@ def main():
             for start in range(0, len(todo), args.batch):
                 batch = todo[start : start + args.batch]
 
-                # Every CPU step for the whole batch, spread across threads.
-                results = list(pool.map(lambda t: fetch_decode_prepare(t, processor), batch))
+                # Download and decode the batch in parallel - these do release
+                # the GIL, so threads genuinely help here.
+                results = list(pool.map(fetch_and_decode, batch))
 
-                # Record the dead links and keep what survived.
+                # Feature extraction stays on the main thread. See the note in
+                # fetch_and_decode: threading it made things six times slower.
                 usable = []
-                for track, inputs, count in results:
+                for track, wave in results:
+                    if wave is None:
+                        writer.append_failed(str(track["track_id"]))
+                        failed += 1
+                        continue
+                    inputs, count = clap.prepare_audio(processor, wave)
                     if inputs is None:
                         writer.append_failed(str(track["track_id"]))
                         failed += 1
-                    else:
-                        usable.append((track, inputs, count))
+                        continue
+                    usable.append((track, inputs, count))
 
                 # One GPU call for the entire batch.
                 if usable:
