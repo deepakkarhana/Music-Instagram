@@ -59,9 +59,9 @@ learning project rather than a wiring job.
 |:----:|-----------|:------:|
 | 1 | Build the song catalog | ✅ done |
 | 2 | Turn every song into an embedding, build the search index | ✅ done |
-| 3 | Define the "vibe" vocabulary, collect photos | 🟡 in progress |
-| 4 | Teach a vision model to describe a photo's vibe | ⬜ |
-| 5 | **First working demo** — upload a photo, get songs | ⬜ |
+| 3 | Define the "vibe" vocabulary, collect photos | ✅ done |
+| 4 | Teach a vision model to describe a photo's vibe | ✅ done |
+| 5 | **First working demo** — upload a photo, get songs | 🟡 next |
 | 6 | Measure it properly against baselines | ⬜ |
 | 7 | Train the aesthetic classifier | ⬜ |
 | 8–9 | Train the image → music bridge | ⬜ |
@@ -121,6 +121,18 @@ words can retrieve music, which is the assumption everything else rests on.
 python scripts/06_probe_vibes.py          # test all 40 vibes against the index
 python scripts/06_probe_vibes.py --full   # see what each one retrieves
 ```
+
+### Then give it a photo
+
+```bash
+python scripts/08_fetch_dev_photos.py     # 118 CC-licensed photos to try
+python scripts/09_tag_photos.py           # what vibes does it see?
+python scripts/10_recommend.py --sample 5 # photo -> vibes -> songs
+```
+
+That last one is the whole project: **CLIP** reads the photo, **CLAP** knows
+the music, and a 40-name vocabulary is the only thing joining two models that
+have never met.
 
 Embedding the full catalog takes about **4 hours on a laptop CPU** or
 **20 minutes on a free Colab T4** — see

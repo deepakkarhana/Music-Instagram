@@ -69,7 +69,9 @@ def main():
     files = sorted(
         os.path.join(args.dir, f)
         for f in os.listdir(args.dir)
-        if os.path.isfile(os.path.join(args.dir, f)) and not f.startswith(".")
+        if os.path.isfile(os.path.join(args.dir, f))
+        and not f.startswith(".")
+        and f != "manifest.csv"  # the attribution record, not a photo
     )
 
     if not files:
