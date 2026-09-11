@@ -61,8 +61,8 @@ learning project rather than a wiring job.
 | 2 | Turn every song into an embedding, build the search index | ✅ done |
 | 3 | Define the "vibe" vocabulary, collect photos | ✅ done |
 | 4 | Teach a vision model to describe a photo's vibe | ✅ done |
-| 5 | **First working demo** — upload a photo, get songs | 🟡 next |
-| 6 | Measure it properly against baselines | ⬜ |
+| 5 | **First working demo** — upload a photo, get songs | ✅ done |
+| 6 | Measure it properly against baselines | 🟡 next |
 | 7 | Train the aesthetic classifier | ⬜ |
 | 8–9 | Train the image → music bridge | ⬜ |
 | 10 | Ranking, variety, and picking the best 15 seconds | ⬜ |
@@ -133,6 +133,17 @@ python scripts/10_recommend.py --sample 5 # photo -> vibes -> songs
 That last one is the whole project: **CLIP** reads the photo, **CLAP** knows
 the music, and a 40-name vocabulary is the only thing joining two models that
 have never met.
+
+### Or just use it
+
+```bash
+python app/main.py
+```
+
+Open <http://127.0.0.1:8000>, drop in a photo, and play the songs it picked.
+It shows the vibes it saw and the query it built, not just the results — when
+a recommendation is wrong it is almost always wrong at the vibe step, and you
+can see it happen.
 
 Embedding the full catalog takes about **4 hours on a laptop CPU** or
 **20 minutes on a free Colab T4** — see
