@@ -23,3 +23,13 @@ librosa>=0.10
 
 # The search index.
 faiss-cpu>=1.8
+
+# ---- The vision half (Week 4) ------------------------------------
+# CLIP reads photos. Pillow opens them and fixes phone rotation.
+pillow>=10.0
+
+# ---- The web demo (Week 5) ---------------------------------------
+#   python app/main.py   then open http://127.0.0.1:8000
+fastapi>=0.110
+uvicorn>=0.27
+python-multipart>=0.0.9

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music for your photo</title>
+<style>
+  :root {
+    --ink:        #f4f1ec;
+    --ink-soft:   #a39d94;
+    --ink-faint:  #6b665f;
+    --ground:     #14120f;
+    --panel:      #1d1a16;
+    --panel-edge: #2b2721;
+    --accent:     #e0a256;
+    --scene:      #7fa8c9;
+    --time:       #c9a87f;
+    --mood:       #c98fa8;
+    --occasion:   #8fc99c;
+    --aesthetic:  #b49ec9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  header { margin-bottom: 36px; }
+  h1 {
+    font: 600 30px/1.15 ui-serif, Georgia, "Times New Roman", serif;
+    letter-spacing: -0.01em; margin: 0 0 8px;
+  }
+  .sub { color: var(--ink-soft); max-width: 56ch; margin: 0; }
+  .sub code { color: var(--accent); font-size: 13px; }
+
+  /* ---------------------------------------------------------- drop zone */
+  #drop {
+    border: 1.5px dashed var(--panel-edge);
+    border-radius: 14px;
+    background: var(--panel);
+    padding: 44px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #drop:hover, #drop.over { border-color: var(--accent); background: #221e19; }
+  #drop.over { border-style: solid; }
+  #drop strong { display: block; font-size: 16px; margin-bottom: 6px; }
+  #drop span { color: var(--ink-faint); font-size: 13px; }
+  #file { display: none; }
+
+  /* ------------------------------------------------------------- result */
+  #result { display: none; margin-top: 32px; }
+  .grid { display: grid; grid-template-columns: 280px 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+
+  #preview {
+    width: 100%; border-radius: 12px; display: block;
+    border: 1px solid var(--panel-edge);
+  }
+
+  h2 {
+    font: 600 11px/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 12px;
+  }
+  .block + .block { margin-top: 26px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    padding: 6px 11px; border-radius: 99px;
+    background: #241f1a; border: 1px solid var(--panel-edge);
+    font-size: 13px;
+  }
+  .chip .dot { width: 7px; height: 7px; border-radius: 99px; }
+  .chip .val { color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  .query {
+    color: var(--ink-soft); font-size: 13px; line-height: 1.6;
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 10px; padding: 12px 14px;
+  }
+
+  ol.songs { list-style: none; margin: 0; padding: 0; }
+  ol.songs li {
+    display: grid; grid-template-columns: 26px 1fr auto; gap: 14px;
+    align-items: center;
+    padding: 13px 0; border-bottom: 1px solid var(--panel-edge);
+  }
+  ol.songs li:last-child { border-bottom: none; }
+  .rank { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .title { font-weight: 500; }
+  .meta { color: var(--ink-faint); font-size: 12.5px; margin-top: 2px; }
+  .score { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+  audio { height: 32px; width: 180px; grid-column: 1 / -1; }
+  @media (max-width: 560px) { audio { width: 100%; } }
+
+  .why { margin-top: 18px; color: var(--ink-soft); font-style: italic; font-size: 13.5px; }
+  .took { color: var(--ink-faint); font-size: 12px; margin-top: 6px; }
+
+  #status { margin-top: 24px; color: var(--ink-soft); }
+  #status.error { color: #d98b7a; }
+  .spin {
+    display: inline-block; width: 13px; height: 13px; margin-right: 9px;
+    border: 2px solid var(--panel-edge); border-top-color: var(--accent);
+    border-radius: 99px; animation: spin .7s linear infinite; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+  footer { margin-top: 56px; color: var(--ink-faint); font-size: 12.5px; line-height: 1.7; }
+  footer b { color: var(--ink-soft); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Music for your photo</h1>
+    <p class="sub">
+      Drop in a photo. It works out what the photo <em>looks</em> like, decides what
+      that should <em>sound</em> like, and finds songs to match — from a catalogue of
+      <b id="count">11,870</b> tracks.
+    </p>
+  </header>
+
+  <div id="drop" tabindex="0" role="button" aria-label="Choose a photo">
+    <strong>Drop a photo here</strong>
+    <span>or click to choose &nbsp;·&nbsp; JPEG, PNG or WebP &nbsp;·&nbsp; up to 15 MB</span>
+  </div>
+  <input type="file" id="file" accept="image/jpeg,image/png,image/webp">
+
+  <div id="status"></div>
+
+  <div id="result">
+    <div class="grid">
+      <img id="preview" alt="The photo you chose">
+      <div>
+        <div class="block">
+          <h2>What it sees</h2>
+          <div class="chips" id="vibes"></div>
+        </div>
+        <div class="block">
+          <h2>What it asked the music model for</h2>
+          <div class="query" id="query"></div>
+        </div>
+        <div class="block">
+          <h2>Songs</h2>
+          <ol class="songs" id="songs"></ol>
+          <p class="why" id="why"></p>
+          <p class="took" id="took"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <b>How it works.</b> One model reads images, a different one understands music,
+    and they have never met. A vocabulary of 40 "vibes" joins them: each vibe has a
+    description of how it <em>looks</em> and a description of how it <em>sounds</em>.
+    The photo is matched on the first, the music is retrieved on the second.<br>
+    <b>Audio.</b> Previews stream directly from Apple. No audio is stored or served here.
+  </footer>
+
+</div>
+
+<script>
+const drop    = document.getElementById('drop');
+const file    = document.getElementById('file');
+const status  = document.getElementById('status');
+const result  = document.getElementById('result');
+const preview = document.getElementById('preview');
+
+const AXIS_COLOUR = {
+  scene: 'var(--scene)', time: 'var(--time)', mood: 'var(--mood)',
+  occasion: 'var(--occasion)', aesthetic: 'var(--aesthetic)'
+};
+
+fetch('/api/health').then(r => r.json()).then(d => {
+  if (d.songs) document.getElementById('count').textContent = d.songs.toLocaleString();
+}).catch(() => {});
+
+drop.addEventListener('click', () => file.click());
+drop.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); }
+});
+file.addEventListener('change', () => { if (file.files[0]) send(file.files[0]); });
+
+['dragenter', 'dragover'].forEach(name =>
+  drop.addEventListener(name, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(name =>
+  drop.addEventListener(name, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => {
+  const dropped = e.dataTransfer.files[0];
+  if (dropped) send(dropped);
+});
+
+function setStatus(text, isError) {
+  status.className = isError ? 'error' : '';
+  status.innerHTML = text;
+}
+
+async function send(chosen) {
+  if (!chosen.type.startsWith('image/')) {
+    setStatus('That is not an image. JPEG, PNG or WebP please.', true);
+    return;
+  }
+  preview.src = URL.createObjectURL(chosen);
+  result.style.display = 'none';
+  setStatus('<span class="spin"></span>Looking at your photo…');
+
+  const body = new FormData();
+  body.append('photo', chosen);
+
+  try {
+    const response = await fetch('/api/recommend', { method: 'POST', body });
+    if (!response.ok) {
+      const problem = await response.json().catch(() => ({}));
+      setStatus(problem.detail || `Something went wrong (${response.status}).`, true);
+      return;
+    }
+    render(await response.json());
+  } catch (error) {
+    setStatus('Could not reach the server. Is it still running?', true);
+  }
+}
+
+function render(data) {
+  setStatus('');
+
+  document.getElementById('vibes').innerHTML = data.vibes.map(v => `
+    <span class="chip">
+      <span class="dot" style="background:${AXIS_COLOUR[v.axis] || 'var(--ink-faint)'}"></span>
+      ${escapeHtml(v.label)}
+      <span class="val">${v.score.toFixed(3)}</span>
+    </span>`).join('');
+
+  document.getElementById('query').textContent = data.query;
+
+  document.getElementById('songs').innerHTML = data.songs.map((s, i) => `
+    <li>
+      <span class="rank">${i + 1}</span>
+      <span>
+        <span class="title">${escapeHtml(s.track_name)}</span>
+        <div class="meta">${escapeHtml(s.artist_name)}${s.release_year ? ' · ' + s.release_year : ''}${s.genre ? ' · ' + escapeHtml(s.genre) : ''}</div>
+      </span>
+      <span class="score">${s.score.toFixed(3)}</span>
+      ${s.preview_url ? `<audio controls preload="none" src="${escapeHtml(s.preview_url)}"></audio>` : ''}
+    </li>`).join('');
+
+  document.getElementById('why').textContent = data.why || '';
+  document.getElementById('took').textContent = `Found in ${data.took_ms} ms.`;
+  result.style.display = 'block';
+}
+
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+</script>
+</body>
+</html>
