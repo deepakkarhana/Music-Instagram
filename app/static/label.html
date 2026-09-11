@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label the photos</title>
+<style>
+  :root {
+    --ink:#f4f1ec; --ink-soft:#a39d94; --ink-faint:#6b665f;
+    --ground:#14120f; --panel:#1d1a16; --edge:#2b2721; --accent:#e0a256;
+    --scene:#7fa8c9; --time:#c9a87f; --mood:#c98fa8;
+    --occasion:#8fc99c; --aesthetic:#b49ec9;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink);
+         font:15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1080px; margin:0 auto; padding:28px 24px 64px; }
+
+  header { display:flex; justify-content:space-between; align-items:baseline;
+           gap:20px; flex-wrap:wrap; margin-bottom:18px; }
+  h1 { font:600 22px/1.2 ui-serif, Georgia, serif; margin:0; }
+  .progress { color:var(--ink-soft); font-size:13px; font-variant-numeric:tabular-nums; }
+  .progress b { color:var(--accent); }
+  .bar { height:3px; background:var(--edge); border-radius:9px; margin-top:6px; width:220px; }
+  .bar span { display:block; height:100%; background:var(--accent); border-radius:9px; width:0; transition:width .2s; }
+
+  .note { color:var(--ink-faint); font-size:12.5px; max-width:74ch;
+          border-left:2px solid var(--edge); padding-left:12px; margin:0 0 22px; }
+
+  .grid { display:grid; grid-template-columns:400px 1fr; gap:26px; align-items:start; }
+  @media (max-width:860px){ .grid{ grid-template-columns:1fr; } }
+
+  #photo { width:100%; border-radius:12px; border:1px solid var(--edge); display:block;
+           background:var(--panel); min-height:260px; object-fit:contain; }
+  .filename { color:var(--ink-faint); font-size:11.5px; margin-top:8px; word-break:break-all; }
+
+  .axis { margin-bottom:18px; }
+  .axis h2 { font:600 11px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing:.1em;
+             text-transform:uppercase; color:var(--ink-faint); margin:0 0 9px;
+             display:flex; align-items:center; gap:8px; }
+  .axis h2 .dot { width:7px; height:7px; border-radius:9px; }
+  .axis h2 em { font-style:normal; color:var(--accent); font-size:10px; letter-spacing:0;
+                text-transform:none; }
+  .chips { display:flex; flex-wrap:wrap; gap:7px; }
+  .chip { padding:6px 11px; border-radius:99px; background:var(--panel);
+          border:1px solid var(--edge); font-size:13px; cursor:pointer;
+          user-select:none; transition:border-color .12s, background .12s; }
+  .chip:hover { border-color:var(--ink-faint); }
+  .chip[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#17140f; font-weight:500; }
+
+  .actions { display:flex; gap:10px; margin-top:26px; flex-wrap:wrap; align-items:center; }
+  button { font:inherit; padding:9px 18px; border-radius:9px; cursor:pointer;
+           border:1px solid var(--edge); background:var(--panel); color:var(--ink); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#17140f; font-weight:600; }
+  button:hover { border-color:var(--ink-faint); }
+  button.primary:hover { filter:brightness(1.08); }
+  kbd { font:11px ui-monospace, monospace; background:var(--panel); border:1px solid var(--edge);
+        border-radius:4px; padding:1px 5px; color:var(--ink-faint); }
+  .hint { color:var(--ink-faint); font-size:12px; margin-left:auto; }
+
+  #done { display:none; text-align:center; padding:60px 20px; }
+  #done h2 { font:600 20px/1.3 ui-serif, Georgia, serif; color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Label the photos</h1>
+    <div class="progress">
+      <span id="counts">loading…</span>
+      <div class="bar"><span id="fill"></span></div>
+    </div>
+  </header>
+
+  <p class="note">
+    Pick what you actually see. Leave an axis blank if it does not apply — most
+    photos are not every kind of thing at once.
+    <b>Nothing is pre-selected on purpose:</b> if the model's guess were ticked
+    already, you would mostly agree with it, and it would end up graded against
+    labels it helped write.
+  </p>
+
+  <div class="grid" id="work">
+    <div>
+      <img id="photo" alt="Photo to label">
+      <div class="filename" id="filename"></div>
+    </div>
+    <div>
+      <div id="axes"></div>
+      <div class="actions">
+        <button class="primary" id="save">Save &amp; next</button>
+        <button id="skip">Skip</button>
+        <span class="hint"><kbd>Enter</kbd> save &nbsp; <kbd>S</kbd> skip</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="done">
+    <h2>All done.</h2>
+    <p class="note" style="border:0; margin:12px auto; max-width:52ch;">
+      Every photo has been looked at. Labels are in <code>data/labels.csv</code>.
+    </p>
+  </div>
+
+</div>
+
+<script>
+const AXIS_COLOUR = { scene:'var(--scene)', time:'var(--time)', mood:'var(--mood)',
+                      occasion:'var(--occasion)', aesthetic:'var(--aesthetic)' };
+let vocabulary = [], current = null, chosen = {};
+
+async function boot() {
+  vocabulary = (await (await fetch('/api/label/vocabulary')).json()).axes;
+  drawAxes();
+  await loadNext();
+}
+
+function drawAxes() {
+  document.getElementById('axes').innerHTML = vocabulary.map(a => `
+    <div class="axis">
+      <h2>
+        <span class="dot" style="background:${AXIS_COLOUR[a.axis]}"></span>
+        ${a.axis}
+        ${a.reliable ? '' : '<em>never properly labelled — this is the important one</em>'}
+      </h2>
+      <div class="chips">
+        ${a.vibes.map(v => `
+          <span class="chip" role="button" aria-pressed="false"
+                data-axis="${a.axis}" data-name="${v.name}" title="${escapeHtml(v.cues)}">
+            ${escapeHtml(v.label)}
+          </span>`).join('')}
+      </div>
+    </div>`).join('');
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const { axis, name } = chip.dataset;
+      const wasOn = chosen[axis] === name;
+      document.querySelectorAll(`.chip[data-axis="${axis}"]`)
+              .forEach(c => c.setAttribute('aria-pressed', 'false'));
+      if (wasOn) { delete chosen[axis]; }
+      else { chosen[axis] = name; chip.setAttribute('aria-pressed', 'true'); }
+    });
+  });
+}
+
+function clearChoices() {
+  chosen = {};
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+}
+
+async function loadNext() {
+  const data = await (await fetch('/api/label/next')).json();
+  updateProgress(data);
+  if (data.done) {
+    document.getElementById('work').style.display = 'none';
+    document.getElementById('done').style.display = 'block';
+    return;
+  }
+  current = data;
+  document.getElementById('photo').src = data.url;
+  document.getElementById('filename').textContent = data.file;
+  clearChoices();
+}
+
+function updateProgress(d) {
+  const done = (d.labelled || 0) + (d.skipped || 0);
+  document.getElementById('counts').innerHTML =
+    `<b>${d.labelled || 0}</b> labelled · ${d.skipped || 0} skipped · ${d.left || 0} left`;
+  document.getElementById('fill').style.width =
+    d.total ? `${100 * done / d.total}%` : '0';
+}
+
+async function send(skipped) {
+  if (!current) return;
+  const body = { folder: current.folder, file: current.file, skipped, ...chosen };
+  const response = await fetch('/api/label', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (response.ok) updateProgress(await response.json());
+  await loadNext();
+}
+
+document.getElementById('save').addEventListener('click', () => send(false));
+document.getElementById('skip').addEventListener('click', () => send(true));
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Enter') { e.preventDefault(); send(false); }
+  if (e.key.toLowerCase() === 's') { e.preventDefault(); send(true); }
+});
+
+function escapeHtml(t) {
+  return String(t ?? '').replace(/[&<>"']/g,
+    c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+boot();
+</script>
+</body>
+</html>

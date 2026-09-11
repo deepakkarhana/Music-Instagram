@@ -101,6 +101,116 @@ def home():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
+# ---------------------------------------------------------------- labelling
+#
+# A second page, for writing labels a person actually believes. The Commons
+# labels are word collisions on the abstract axes - "calm" fetched photos of
+# an airline called Calm Air - so mood and aesthetic have never been measured.
+#
+# Deliberately absent: any pre-selection of what CLIP guessed. It would make
+# labelling about three times faster, and people accept a pre-filled answer
+# rather than re-examining it, so the labels would drift toward agreeing with
+# the model being tested. Accuracy would rise and mean nothing.
+
+PHOTO_FOLDERS = [
+    os.path.join("data", "photos"),       # the user's own - most valuable
+    os.path.join("data", "photos_dev"),   # Commons development set
+]
+
+
+@app.get("/label")
+def label_page():
+    return FileResponse(os.path.join(STATIC_DIR, "label.html"))
+
+
+@app.get("/api/label/next")
+def label_next():
+    """The next unlabelled photo, plus how much is left."""
+    from src.vibe import labels as label_store
+
+    folder, name = label_store.next_unlabelled(PHOTO_FOLDERS)
+    state = label_store.progress(PHOTO_FOLDERS)
+    if not name:
+        return {"done": True, **state}
+
+    return {
+        "done": False,
+        "folder": folder,
+        "file": name,
+        "url": f"/api/photo?folder={folder}&file={name}",
+        **state,
+    }
+
+
+@app.get("/api/photo")
+def serve_photo(folder: str, file: str):
+    """Serve one photo for the labelling page.
+
+    Both parts are checked against the known folders and a plain filename,
+    because anything that turns a URL into a file path is a way to read files
+    that were never meant to be served.
+    """
+    if folder not in PHOTO_FOLDERS or os.path.basename(file) != file:
+        raise HTTPException(400, "Unknown photo.")
+    path = os.path.join(folder, file)
+    if not os.path.isfile(path):
+        raise HTTPException(404, "No such photo.")
+    return FileResponse(path)
+
+
+@app.get("/api/label/vocabulary")
+def label_vocabulary():
+    """The 40 vibes, grouped by axis, for the page to draw."""
+    return {
+        "axes": [
+            {
+                "axis": axis,
+                "reliable": axis in taxonomy.LABEL_RELIABLE_AXES,
+                "vibes": [
+                    {"name": v.name, "label": v.label, "cues": v.visual_cues}
+                    for v in taxonomy.by_axis(axis)
+                ],
+            }
+            for axis in taxonomy.AXES
+        ]
+    }
+
+
+@app.post("/api/label")
+async def label_save(payload: dict):
+    """Record one photo's labels, or that it was skipped."""
+    from src.vibe import labels as label_store
+
+    folder = payload.get("folder", "")
+    name = payload.get("file", "")
+    if folder not in PHOTO_FOLDERS or os.path.basename(name) != name:
+        raise HTTPException(400, "Unknown photo.")
+
+    valid = {v.name for v in taxonomy.VIBES}
+    row = {"folder": folder, "file": name,
+           "skipped": "1" if payload.get("skipped") else ""}
+    for axis in taxonomy.AXES:
+        chosen = payload.get(axis) or ""
+        if chosen and chosen not in valid:
+            raise HTTPException(400, f"No vibe called {chosen!r}.")
+        row[axis] = chosen
+
+    label_store.save(row)
+    return {"saved": True, **label_store.progress(PHOTO_FOLDERS)}
+
+
+@app.get("/api/label/counts")
+def label_counts():
+    """Per-vibe totals, so thin classes show up early rather than at the end."""
+    from src.vibe import labels as label_store
+
+    counts = label_store.counts_by_vibe()
+    return {
+        "counts": {v.name: counts.get(v.name, 0) for v in taxonomy.VIBES},
+        "labels": {v.name: v.label for v in taxonomy.VIBES},
+    }
+
+
 @app.get("/api/health")
 def health():
     """Enough to tell whether the thing is actually up and loaded."""

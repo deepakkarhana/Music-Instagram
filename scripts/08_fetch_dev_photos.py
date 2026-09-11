@@ -49,12 +49,23 @@ FIELDNAMES = ["file", "vibe", "axis", "title", "author", "licence", "source_page
 
 
 def load_manifest(path):
-    """Existing rows, so reruns skip what is already downloaded."""
+    """Existing rows, plus how many photos each vibe already has.
+
+    Counting per vibe rather than just "has this vibe been done" is what lets
+    you raise --per-vibe later and top up, instead of the rerun deciding
+    everything is finished and doing nothing. Titles already downloaded are
+    tracked too, so a top-up fetches *new* photos rather than the same ones.
+    """
     if not os.path.exists(path):
-        return [], set()
+        return [], {}, set()
     with open(path, "r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
-    return rows, {r["vibe"] for r in rows}
+
+    counts = {}
+    for row in rows:
+        counts[row["vibe"]] = counts.get(row["vibe"], 0) + 1
+    titles = {r["title"] for r in rows}
+    return rows, counts, titles
 
 
 def main():
@@ -71,16 +82,17 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     manifest_path = os.path.join(args.out, "manifest.csv")
 
-    rows, done_vibes = load_manifest(manifest_path)
-    if done_vibes:
-        print(f"Resuming: {len(rows)} photos already fetched "
-              f"for {len(done_vibes)} vibes\n")
+    rows, counts, have_titles = load_manifest(manifest_path)
+    if rows:
+        print(f"Already have {len(rows)} photos across {len(counts)} vibes")
+        print(f"Topping up to {args.per_vibe} each")
+        print()
 
     vibes = taxonomy.by_axis(args.axis) if args.axis else taxonomy.VIBES
-    todo = [v for v in vibes if v.name not in done_vibes]
+    todo = [v for v in vibes if counts.get(v.name, 0) < args.per_vibe]
 
     if not todo:
-        print(f"Nothing to do - all {len(vibes)} vibes already have photos.")
+        print(f"Nothing to do - every vibe already has {args.per_vibe} photos.")
         print(f"\nNext:  python scripts/07_check_photos.py --dir {args.out}")
         return 0
 
@@ -127,11 +139,16 @@ def main():
                 photo_source.polite_pause()
                 continue
 
+            already = counts.get(vibe.name, 0)
+            wanted = args.per_vibe - already
             kept = 0
             for item in found:
-                if kept >= args.per_vibe:
+                if kept >= wanted:
                     break
-                filename = photo_source.safe_name(vibe.name, kept + 1, item["title"])
+                if item["title"] in have_titles:
+                    continue  # already downloaded on an earlier run
+                filename = photo_source.safe_name(
+                    vibe.name, already + kept + 1, item["title"])
                 target = os.path.join(args.out, filename)
 
                 if args.dry_run:
@@ -153,12 +170,13 @@ def main():
                     "query": query,
                 })
                 handle.flush()
+                have_titles.add(item["title"])
                 kept += 1
                 saved += 1
 
             if kept == 0:
                 empty.append(vibe.name)
-            print(f"      kept {kept}")
+            print(f"      kept {kept}  (vibe now has {already + kept})")
             photo_source.polite_pause()
 
     except KeyboardInterrupt:

@@ -146,11 +146,26 @@ def report(result):
     print(f"    top-3  {result['top3']:>4}/{n}  {100*result['top3']/n:5.1f}%")
     print(f"    top-5  {result['top5']:>4}/{n}  {100*result['top5']/n:5.1f}%")
     print("\n  top-3 accuracy by axis")
+    reliable_hits = reliable_total = 0
     for axis in taxonomy.AXES:
         total = result["axis_total"][axis]
-        if total:
-            hits = result["axis_hits"][axis]
-            print(f"    {axis:<10} {hits:>3}/{total:<3} {100*hits/total:5.1f}%")
+        if not total:
+            continue
+        hits = result["axis_hits"][axis]
+        trustworthy = axis in taxonomy.LABEL_RELIABLE_AXES
+        note = "" if trustworthy else "   <- labels unreliable"
+        print(f"    {axis:<10} {hits:>3}/{total:<3} {100*hits/total:5.1f}%{note}")
+        if trustworthy:
+            reliable_hits += hits
+            reliable_total += total
+
+    if reliable_total:
+        print()
+        print(f"  ON TRUSTWORTHY LABELS ONLY: {reliable_hits}/{reliable_total} "
+              f"({100*reliable_hits/reliable_total:.1f}%)")
+        print("    mood and aesthetic excluded - their labels are word collisions")
+        print("    (Calm Air the airline, Melencolia the engraving, the Y2K bug).")
+        print("    Those two axes are UNTESTED, not disproven. See taxonomy.py.")
 
 
 def main():
@@ -209,6 +224,8 @@ def main():
     print("\n" + "=" * 66)
     print(f"WHAT {best['model']} SEES")
     print("=" * 66)
+    if args.show < 1:
+        return 0
     step = max(1, len(paths) // args.show)
     sample = list(range(0, len(paths), step))[: args.show]
     for i in sample:

@@ -251,6 +251,41 @@ VIBES = [
 
 AXES = ("scene", "time", "mood", "occasion", "aesthetic")
 
+# WHICH AXES CAN BE LABELLED BY IMAGE SEARCH, AND WHICH CANNOT
+# ------------------------------------------------------------
+# The development photos were labelled by searching Wikimedia Commons for each
+# vibe. That works when the vibe is a concrete noun and fails badly when it is
+# an abstract quality, because Commons search matches *words in titles*.
+#
+# Reliable - searching the word returns the thing:
+#     scene      "Beach of Cape Fiolent"          a beach
+#     occasion   "A fancy Indian wedding"         a wedding
+#     time       "Louvre at night"                a night scene
+#
+# Unreliable - searching the word returns something merely NAMED that:
+#     mood       "calm"        -> Calm Air, an airline. Photos of a Saab.
+#                "melancholy"  -> Durer's Melencolia I engraving
+#                "nostalgic"   -> the Istanbul Nostalgic Tram
+#                "romantic"    -> Romanticism, the art movement
+#                "dramatic"    -> the Academy of Dramatic Arts, a building
+#     aesthetic  "old money"   -> literal banknotes and a money box
+#                "streetwear"  -> graphics with the word on a background
+#                "minimal"     -> minimal surfaces, from mathematics
+#                "y2k"         -> the Y2K computer bug
+#
+# 43 of 118 development photos carry a label of the second kind. Any accuracy
+# figure computed over them is measuring word collisions, not vision.
+#
+# This matters because it corrects an earlier conclusion. Week 4 reported
+# "mood 22.7%" and Week 6 built on it to argue CLIP is weak at mood. That is
+# not established: a model refusing to call a photograph of an aeroplane
+# "calm" is behaving correctly, and would be marked wrong.
+#
+# Mood remains untested, not disproven. Testing it needs labels a person wrote
+# while looking at the photo.
+LABEL_RELIABLE_AXES = ("scene", "time", "occasion")
+LABEL_UNRELIABLE_AXES = ("mood", "aesthetic")
+
 
 def names():
     """Every vibe name, in order."""
