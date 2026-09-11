@@ -62,8 +62,8 @@ learning project rather than a wiring job.
 | 3 | Define the "vibe" vocabulary, collect photos | ✅ done |
 | 4 | Teach a vision model to describe a photo's vibe | ✅ done |
 | 5 | **First working demo** — upload a photo, get songs | ✅ done |
-| 6 | Measure it properly against baselines | 🟡 next |
-| 7 | Train the aesthetic classifier | ⬜ |
+| 6 | Measure it properly against baselines | ✅ done |
+| 7 | Train the aesthetic classifier | 🟡 next |
 | 8–9 | Train the image → music bridge | ⬜ |
 | 10 | Ranking, variety, and picking the best 15 seconds | ⬜ |
 | 11 | The agent layer and explanations | ⬜ |
@@ -133,6 +133,16 @@ python scripts/10_recommend.py --sample 5 # photo -> vibes -> songs
 That last one is the whole project: **CLIP** reads the photo, **CLAP** knows
 the music, and a 40-name vocabulary is the only thing joining two models that
 have never met.
+
+### Then check whether it actually works
+
+```bash
+python scripts/11_evaluate.py
+```
+
+Compares the pipeline against random, popularity and keyword matching.
+Current result: **20.8x the keyword baseline**, with random and popularity at
+exactly 0%. See [docs/week-06.md](docs/week-06.md).
 
 ### Or just use it
 
