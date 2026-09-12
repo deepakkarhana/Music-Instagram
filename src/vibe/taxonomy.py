@@ -283,6 +283,53 @@ AXES = ("scene", "time", "mood", "occasion", "aesthetic")
 #
 # Mood remains untested, not disproven. Testing it needs labels a person wrote
 # while looking at the photo.
+# HOW TO SEARCH FOR A PHOTO THAT HAS A MOOD
+# -----------------------------------------
+# Searching an image library for "melancholy" returns Durer's engraving and a
+# book cover, because search engines match words in titles and "melancholy" is
+# mostly used as a name. Searching for "calm" returns an airline.
+#
+# The fix is to search for the *photographic situation* that carries the mood
+# instead of the mood itself. A rain-streaked window is melancholy without ever
+# using the word; a crowd with raised hands is euphoric.
+#
+# This also explains why the first attempt produced photos with no mood at all.
+# A person asked to name the mood of those photos declined 83% of the time -
+# not out of indecision, but because a photograph of a tram has no mood.
+#
+# Only the abstract axes need this. "Beach" and "Indian wedding" are perfectly
+# good search terms for themselves.
+PHOTO_SEARCH_TERMS = {
+    # ------------------------------------------------------------- mood
+    "nostalgic":  ["faded old family photograph", "vintage film grain street scene"],
+    "romantic":   ["couple silhouette at sunset", "couple holding hands close"],
+    "melancholy": ["rain drops on a window", "empty bench in fog"],
+    "euphoric":   ["concert crowd hands raised", "festival fireworks celebration"],
+    "confident":  ["fashion portrait direct gaze", "studio portrait strong pose"],
+    "calm":       ["still lake reflection at dawn", "misty quiet morning water"],
+    "playful":    ["children laughing playing water", "dog running splashing"],
+    "dramatic":   ["storm clouds dramatic light", "silhouette against dramatic sky"],
+
+    # -------------------------------------------------------- aesthetic
+    "old_money":        ["vintage library interior leather", "classic tailored suit portrait"],
+    "streetwear":       ["street fashion urban outfit", "sneakers against graffiti wall"],
+    "traditional_indian": ["saree portrait woman", "mehndi henna decorated hands"],
+    "minimal":          ["minimalist white interior", "single object negative space"],
+    "vintage_bollywood": ["retro indian film actress", "1970s indian fashion"],
+    "y2k":              ["2000s party flash photography", "early 2000s fashion teenagers"],
+    "cottagecore":      ["wildflower meadow linen dress", "rustic kitchen baking bread"],
+}
+
+
+def search_terms(vibe):
+    """What to type into an image search to find photos of this vibe.
+
+    Falls back to the label, which is right for concrete vibes and wrong for
+    abstract ones - hence the table above.
+    """
+    return PHOTO_SEARCH_TERMS.get(vibe.name, [vibe.label])
+
+
 LABEL_RELIABLE_AXES = ("scene", "time", "occasion")
 LABEL_UNRELIABLE_AXES = ("mood", "aesthetic")
 

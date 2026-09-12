@@ -135,6 +135,81 @@ def search(term, limit=10, timeout=45):
     return results
 
 
+OPENVERSE_URL = "https://api.openverse.org/v1/images/"
+
+
+def search_openverse(term, limit=10, timeout=60):
+    """Search Openverse, which aggregates Flickr and other CC photo libraries.
+
+    WHY A SECOND SOURCE
+    -------------------
+    Wikimedia Commons is an encyclopaedia's picture library: documentary and
+    reference photographs, carefully catalogued. Excellent for "what does an
+    Indian wedding look like", useless for "what does melancholy look like",
+    because nobody uploads a moody photograph to illustrate an article.
+
+    Openverse reaches Flickr, which is where people post photographs taken for
+    their own sake. The difference is immediate - searching "rain drops on a
+    window" returns "Window Pain" and "Here comes the rain again..", which are
+    photographs with a mood rather than records of an object.
+
+    Same licensing discipline: commercial use and modification only, with the
+    creator and licence recorded for every download.
+    """
+    params = {
+        "q": term,
+        "page_size": min(limit, 20),
+        "license_type": "commercial,modification",
+    }
+    url = OPENVERSE_URL + "?" + urllib.parse.urlencode(params)
+
+    try:
+        request = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.load(response)
+    except Exception as error:
+        print(f"    openverse failed for {term!r}: {type(error).__name__}")
+        return []
+
+    results = []
+    for item in payload.get("results", []):
+        link = item.get("url")
+        if not link:
+            continue
+        # Skip anything tiny - it will be upscaled into invented detail later.
+        if (item.get("width") or 0) < 600:
+            continue
+
+        licence = str(item.get("license", "")).upper()
+        version = item.get("license_version") or ""
+        results.append({
+            "title": (item.get("title") or "untitled")[:90],
+            "author": _strip_html(item.get("creator")),
+            "licence": f"CC {licence} {version}".strip(),
+            "url": link,
+            "page": item.get("foreign_landing_url", ""),
+            "width": item.get("width", 0),
+            "height": item.get("height", 0),
+        })
+    return results
+
+
+def search_best(term, limit=10, prefer="commons"):
+    """Search one source, falling back to the other when it finds nothing.
+
+    Commons is better for concrete subjects and Openverse for atmospheric
+    ones, so the caller picks which to try first and this handles the miss.
+    """
+    first = search if prefer == "commons" else search_openverse
+    second = search_openverse if prefer == "commons" else search
+
+    found = first(term, limit=limit)
+    if found:
+        return found, prefer
+    polite_pause()
+    return second(term, limit=limit), ("openverse" if prefer == "commons" else "commons")
+
+
 def download(url, path, timeout=60):
     """Save one image. Returns True on success."""
     try:

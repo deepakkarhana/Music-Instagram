@@ -113,26 +113,34 @@ def main():
 
     try:
         for number, vibe in enumerate(todo, start=1):
-            # Try several phrasings, shortest first, and stop at the first that
-            # returns anything. Measured on four awkward vibes: the label alone
-            # found results 4/4 times, the first visual cue alone 4/4, and
-            # "label + cue" only 2/4. Commons search rewards short queries;
-            # stacking words narrows it to nothing.
-            candidates = [
-                vibe.label,
-                vibe.visual_cues.split(",")[0].strip(),
-                f"{vibe.label} {vibe.visual_cues.split(',')[0].strip()}",
-            ]
+            # WHERE TO LOOK DEPENDS ON WHAT WE ARE LOOKING FOR.
+            #
+            # Commons is an encyclopaedia's picture library: excellent for
+            # "Indian wedding", useless for "melancholy", because nobody
+            # uploads a moody photograph to illustrate an article. Openverse
+            # reaches Flickr, where people post photographs for their own sake.
+            #
+            # And the search terms differ too. Searching "melancholy" finds
+            # Durer's engraving; searching "rain drops on a window" finds a
+            # photograph that actually feels melancholy. taxonomy.py holds the
+            # concrete phrasings for the abstract vibes.
+            abstract = vibe.axis in taxonomy.LABEL_UNRELIABLE_AXES
+            prefer = "openverse" if abstract else "commons"
 
-            found, query = [], candidates[0]
+            candidates = list(taxonomy.search_terms(vibe))
+            if not abstract:
+                candidates.append(vibe.visual_cues.split(",")[0].strip())
+
+            found, query, source = [], candidates[0], prefer
             for candidate in candidates:
-                found = photo_source.search(candidate, limit=args.per_vibe * 4)
+                found, source = photo_source.search_best(
+                    candidate, limit=args.per_vibe * 4, prefer=prefer)
                 query = candidate
                 if found:
                     break
                 photo_source.polite_pause()
 
-            print(f"[{number}/{len(todo)}] {vibe.label:<24} \"{query}\"")
+            print(f"[{number}/{len(todo)}] {vibe.label:<22} [{source}] \"{query}\"")
             if not found:
                 print("      nothing usable found")
                 empty.append(vibe.name)
