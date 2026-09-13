@@ -1,3 +1,15 @@
+---
+title: Music for your photo
+emoji: 🎵
+colorFrom: yellow
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+short_description: Drop in a photo, get songs that fit. CLIP reads the image, CLAP knows the music.
+---
+
 # Music-Instagram
 
 **Give it a photo. It recommends the songs that fit.**
