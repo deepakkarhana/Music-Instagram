@@ -330,8 +330,24 @@ def search_terms(vibe):
     return PHOTO_SEARCH_TERMS.get(vibe.name, [vibe.label])
 
 
-LABEL_RELIABLE_AXES = ("scene", "time", "occasion")
-LABEL_UNRELIABLE_AXES = ("mood", "aesthetic")
+# RESOLVED. Mood was moved back once it had photographs that have a mood and
+# labels a person wrote. Measured on 172 human labels, within-axis:
+#
+#     mood        67%   against 12% chance    5.4x
+#     occasion    67%   against 11%           6.0x
+#     scene       62%   against  8%           7.4x
+#     time        46%   against 25%           1.8x
+#     aesthetic   11%   against 14%           below chance
+#
+# Mood is one of the strongest axes in the system. The earlier "22.7%, CLIP is
+# weak at mood" was two mistakes stacked: labels that were word collisions, and
+# a metric asking a question the pipeline never asks. Neither had anything to
+# do with the model.
+#
+# Aesthetic is still unmeasured rather than poor - its photos are junk
+# (vintage_bollywood fetched skunks) and there are only 9 labels.
+LABEL_RELIABLE_AXES = ("scene", "time", "occasion", "mood")
+LABEL_UNRELIABLE_AXES = ("aesthetic",)
 
 
 def names():
