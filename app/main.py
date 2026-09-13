@@ -46,6 +46,7 @@ from src.agent import recommend as recommender
 from src.encode import clap
 from src.encode.store import read_catalog
 from src.retrieve import index as index_module
+from src.retrieve import filters
 from src.vibe import taxonomy
 from src.vibe import vision
 
@@ -259,9 +260,14 @@ async def recommend_endpoint(photo: UploadFile = File(...), k: int = 5):
         picked, STATE["vibe_text_vectors"],
         clap_model=clap_model, clap_processor=clap_processor, device=device,
     )
+    # Language comes from the catalogue, not from the audio. Two separate
+    # weeks measured that looking it up beats asking CLAP to infer it, and the
+    # cost is a few points of agreement with CLAP - which is the point, since
+    # CLAP is the thing being corrected.
+    lane = filters.wanted_lane(picked)
     results = recommender.recommend(
         query_vector.reshape(1, -1), STATE["index"], STATE["track_ids"],
-        STATE["catalog_by_id"], k=max(1, min(k, 10)), per_artist=1,
+        STATE["catalog_by_id"], k=max(1, min(k, 10)), per_artist=1, lane=lane,
     )
 
     return {
@@ -282,6 +288,7 @@ async def recommend_endpoint(photo: UploadFile = File(...), k: int = 5):
             }
             for t in results
         ],
+        "language_filter": lane or "",
         "why": recommender.explain(picked, results[0]) if results else "",
         "took_ms": int((time.time() - started) * 1000),
     }

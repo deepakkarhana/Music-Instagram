@@ -49,6 +49,7 @@ from src.agent import recommend as recommender
 from src.encode import clap
 from src.encode.store import read_catalog
 from src.eval import baselines, metrics
+from src.retrieve import filters
 from src.retrieve import index as index_module
 from src.vibe import taxonomy, vision
 
@@ -110,7 +111,7 @@ def main():
     # Popularity ignores the photo, so compute it once.
     popular = baselines.popular_songs(track_ids, catalog_by_id, k=K)
 
-    METHODS = ("random", "popular", "keyword", "keyword+", "ours", "oracle")
+    METHODS = ("random", "popular", "keyword", "keyword+", "ours", "ours+lane", "oracle")
     rows = {name: [] for name in METHODS}
     vibe_hits = 0
 
@@ -124,6 +125,15 @@ def main():
         oracle_pool = baselines.oracle_songs(
             gold, vibe_text_vectors, taxonomy.VIBES, index, track_ids, k=ORACLE_POOL)
 
+        # A SECOND oracle that applies the same language filter. Scoring a
+        # filtered method against an unfiltered reference is unfair by
+        # construction: every correctly-filtered-out song counts as a miss.
+        # This says how much of the recall drop is real and how much is the
+        # metric disagreeing with itself.
+        gold_lane = filters.wanted_lane([(gold, 1.0)])
+        oracle_lane_pool, _ = filters.apply_lane(
+            oracle_pool, catalog_by_id, gold_lane, minimum=1)
+
         # --- our pipeline --------------------------------------------------
         picked = recommender.photo_to_vibes(
             clip_model, clip_processor, device, image, vibe_image_vectors)
@@ -136,6 +146,15 @@ def main():
             str(t["track_id"]) for t in recommender.recommend(
                 query_vector.reshape(1, -1), index, track_ids, catalog_by_id,
                 k=K, per_artist=1)
+        ]
+
+        # The same pipeline with the metadata language filter, so its effect is
+        # measured against the unfiltered version rather than assumed.
+        lane = filters.wanted_lane(picked)
+        ours_lane = [
+            str(t["track_id"]) for t in recommender.recommend(
+                query_vector.reshape(1, -1), index, track_ids, catalog_by_id,
+                k=K, per_artist=1, lane=lane)
         ]
 
         methods = {
@@ -154,6 +173,7 @@ def main():
                 picked[0][0], track_ids, catalog_by_id, k=K),
             "keyword+": baselines.keyword_songs(gold, track_ids, catalog_by_id, k=K),
             "ours": ours,
+            "ours+lane": ours_lane,
             "oracle": oracle_pool[:K],
         }
 
@@ -162,9 +182,11 @@ def main():
         # made the popularity baseline look perfect.
         want = metrics.expected_lane(gold.name)
         for name, ids in methods.items():
+            # The filtered method is judged against the filtered oracle.
+            reference = oracle_lane_pool if name == "ours+lane" else oracle_pool
             row = {
-                "recall": metrics.recall_at_k(ids, oracle_pool, k=K),
-                "ndcg": metrics.ndcg_at_k(ids, oracle_pool, k=K),
+                "recall": metrics.recall_at_k(ids, reference, k=K),
+                "ndcg": metrics.ndcg_at_k(ids, reference, k=K),
                 "diversity": metrics.artist_diversity(ids, catalog_by_id),
             }
             if want == "indian":
@@ -194,6 +216,7 @@ def main():
         balanced = (lane_in + lane_en) / 2 if lane_in is not None and lane_en is not None else None
         fmt = lambda v: f"{100*v:.0f}%" if v is not None else "-"
         mark = ("  <- ours" if name == "ours"
+                else "  <- ours + language filter" if name == "ours+lane"
                 else "  (by construction)" if name == "oracle"
                 else "  (given the TRUE vibe)" if name == "keyword+" else "")
         print(f"{name:<11}{100*stats['recall']:>9.1f}%{stats['ndcg']:>9.3f}"

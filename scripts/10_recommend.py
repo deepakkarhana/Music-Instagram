@@ -38,6 +38,7 @@ from src.encode import clap
 from src.encode.store import read_catalog
 from src.retrieve import index as index_module
 from src.vibe import taxonomy
+from src.retrieve import filters
 from src.vibe import vision
 
 CATALOG_PATH = os.path.join("data", "raw", "itunes_catalog.csv")
@@ -60,6 +61,8 @@ def main():
                         help="how to merge several vibes into one music query")
     parser.add_argument("--per-artist", type=int, default=1,
                         help="max songs from one artist")
+    parser.add_argument("--no-language-filter", action="store_true",
+                        help="do not restrict Indian/Western vibes by catalogue language")
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
 
@@ -129,10 +132,14 @@ def main():
         print(f"\n  Music query ({args.combine}):")
         print(f"    {description}")
 
+        lane = None if args.no_language_filter else filters.wanted_lane(picked)
         results = recommender.recommend(
             query_vector.reshape(1, -1), index, track_ids, catalog_by_id,
-            k=args.k, per_artist=args.per_artist,
+            k=args.k, per_artist=args.per_artist, lane=lane,
         )
+        if lane:
+            print()
+            print(f"  Language filter: {lane} (from the catalogue, not the audio)")
         print("\n  Songs:")
         for rank, track in enumerate(results, start=1):
             name = (track.get("track_name") or "?")[:42]
