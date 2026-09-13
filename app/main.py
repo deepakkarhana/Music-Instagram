@@ -46,7 +46,7 @@ from src.agent import recommend as recommender
 from src.encode import clap
 from src.encode.store import read_catalog
 from src.retrieve import index as index_module
-from src.retrieve import filters
+from src.retrieve import filters, rerank
 from src.vibe import taxonomy
 from src.vibe import vision
 
@@ -268,6 +268,7 @@ async def recommend_endpoint(photo: UploadFile = File(...), k: int = 5):
     results = recommender.recommend(
         query_vector.reshape(1, -1), STATE["index"], STATE["track_ids"],
         STATE["catalog_by_id"], k=max(1, min(k, 10)), per_artist=1, lane=lane,
+        diversity=rerank.DEFAULT_LAMBDA,
     )
 
     return {

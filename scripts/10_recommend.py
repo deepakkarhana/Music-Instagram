@@ -38,7 +38,7 @@ from src.encode import clap
 from src.encode.store import read_catalog
 from src.retrieve import index as index_module
 from src.vibe import taxonomy
-from src.retrieve import filters
+from src.retrieve import filters, rerank
 from src.vibe import vision
 
 CATALOG_PATH = os.path.join("data", "raw", "itunes_catalog.csv")
@@ -61,6 +61,8 @@ def main():
                         help="how to merge several vibes into one music query")
     parser.add_argument("--per-artist", type=int, default=1,
                         help="max songs from one artist")
+    parser.add_argument("--diversity", type=float, default=rerank.DEFAULT_LAMBDA,
+                        help="1.0 = best matches only, lower = more varied (default 0.7)")
     parser.add_argument("--no-language-filter", action="store_true",
                         help="do not restrict Indian/Western vibes by catalogue language")
     parser.add_argument("--device", default=None)
@@ -136,6 +138,7 @@ def main():
         results = recommender.recommend(
             query_vector.reshape(1, -1), index, track_ids, catalog_by_id,
             k=args.k, per_artist=args.per_artist, lane=lane,
+            diversity=args.diversity,
         )
         if lane:
             print()

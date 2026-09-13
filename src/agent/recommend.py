@@ -111,7 +111,7 @@ def vibes_to_query_vector(picked, vibe_text_vectors, vibes=None, combine="averag
 
 
 def recommend(query_vector, index, track_ids, catalog_by_id, k=5, per_artist=1,
-              lane=None):
+              lane=None, diversity=None):
     """Search the catalog and return readable results.
 
     `per_artist` caps how many songs one artist can contribute. Without it a
@@ -123,34 +123,54 @@ def recommend(query_vector, index, track_ids, catalog_by_id, k=5, per_artist=1,
     asking the embedding to infer it - see `src/retrieve/filters.py`. Pass
     None, the default, to leave the results alone.
     """
-    from src.retrieve import filters
+    from src.retrieve import filters, rerank
 
     # Ask for far more than we need when filtering, because the lane filter can
     # discard most of a result set before the per-artist cap even runs.
     pool = min(k * (40 if lane else 8), index.ntotal)
     scores, rows = index_module.search(index, query_vector, k=pool)
 
-    ordered = [(float(s), track_ids[r]) for s, r in zip(scores[0], rows[0]) if r >= 0]
+    ordered = [(float(s), int(r), track_ids[r])
+               for s, r in zip(scores[0], rows[0]) if r >= 0]
 
     if lane:
         allowed, applied = filters.apply_lane(
-            [t for _, t in ordered], catalog_by_id, lane)
+            [t for _, _, t in ordered], catalog_by_id, lane)
         if applied:
             allowed = set(allowed)
-            ordered = [(s, t) for s, t in ordered if t in allowed]
+            ordered = [item for item in ordered if item[2] in allowed]
 
+    # The artist cap runs first, so diversity reranking chooses among songs
+    # that are already one-per-artist rather than spending its budget
+    # rediscovering that.
     seen_artists = {}
-    results = []
-    for score, track_id in ordered:
-        track = dict(catalog_by_id.get(track_id, {}))
-        artist = (track.get("artist_name") or "?").lower()
+    shortlist = []
+    for score, row, track_id in ordered:
+        artist = (catalog_by_id.get(track_id, {}).get("artist_name") or "?").lower()
         if seen_artists.get(artist, 0) >= per_artist:
             continue
         seen_artists[artist] = seen_artists.get(artist, 0) + 1
+        shortlist.append((score, row, track_id))
+        if len(shortlist) >= k * 6:
+            break
+
+    if diversity is not None and diversity < 1.0 and len(shortlist) > k:
+        picked = rerank.mmr(
+            [row for _, row, _ in shortlist],
+            [score for score, _, _ in shortlist],
+            index, k=k, lam=diversity,
+        )
+        # MMR decides WHICH songs appear; relevance decides the order they are
+        # shown in. Leaving them in MMR order puts a 0.559 below a 0.515, and a
+        # numbered list whose scores go up and down looks broken to anyone
+        # reading it - the selection logic is not visible, only the result.
+        shortlist = sorted((shortlist[i] for i in picked), key=lambda item: -item[0])
+
+    results = []
+    for score, _, track_id in shortlist[:k]:
+        track = dict(catalog_by_id.get(track_id, {}))
         track["score"] = score
         results.append(track)
-        if len(results) >= k:
-            break
 
     return results
 

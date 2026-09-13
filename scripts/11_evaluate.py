@@ -49,7 +49,7 @@ from src.agent import recommend as recommender
 from src.encode import clap
 from src.encode.store import read_catalog
 from src.eval import baselines, metrics
-from src.retrieve import filters
+from src.retrieve import filters, rerank
 from src.retrieve import index as index_module
 from src.vibe import taxonomy, vision
 
@@ -111,7 +111,8 @@ def main():
     # Popularity ignores the photo, so compute it once.
     popular = baselines.popular_songs(track_ids, catalog_by_id, k=K)
 
-    METHODS = ("random", "popular", "keyword", "keyword+", "ours", "ours+lane", "oracle")
+    METHODS = ("random", "popular", "keyword", "keyword+", "ours", "ours+lane",
+               "ours+all", "oracle")
     rows = {name: [] for name in METHODS}
     vibe_hits = 0
 
@@ -157,6 +158,14 @@ def main():
                 k=K, per_artist=1, lane=lane)
         ]
 
+        # Everything on: language filter plus diversity reranking. This is the
+        # configuration the demo actually serves.
+        ours_all = [
+            str(t["track_id"]) for t in recommender.recommend(
+                query_vector.reshape(1, -1), index, track_ids, catalog_by_id,
+                k=K, per_artist=1, lane=lane, diversity=rerank.DEFAULT_LAMBDA)
+        ]
+
         methods = {
             "random": baselines.random_songs(track_ids, k=K, seed=number),
             "popular": popular,
@@ -174,6 +183,7 @@ def main():
             "keyword+": baselines.keyword_songs(gold, track_ids, catalog_by_id, k=K),
             "ours": ours,
             "ours+lane": ours_lane,
+            "ours+all": ours_all,
             "oracle": oracle_pool[:K],
         }
 
@@ -183,11 +193,13 @@ def main():
         want = metrics.expected_lane(gold.name)
         for name, ids in methods.items():
             # The filtered method is judged against the filtered oracle.
-            reference = oracle_lane_pool if name == "ours+lane" else oracle_pool
+            reference = (oracle_lane_pool
+                         if name in ("ours+lane", "ours+all") else oracle_pool)
             row = {
                 "recall": metrics.recall_at_k(ids, reference, k=K),
                 "ndcg": metrics.ndcg_at_k(ids, reference, k=K),
                 "diversity": metrics.artist_diversity(ids, catalog_by_id),
+                "samey": metrics.sound_alike(ids, track_ids, index),
             }
             if want == "indian":
                 row["lane_in"] = metrics.lane_precision(ids, catalog_by_id, "indian")
@@ -202,8 +214,8 @@ def main():
     print("\n" + "=" * 74)
     print(f"RESULTS - {len(files)} photos, top-{K} recommendations")
     print("=" * 74)
-    print(f"{'method':<11}{'recall@5':>10}{'nDCG@5':>9}{'divers':>8}"
-          f"{'IN vibes':>10}{'EN vibes':>10}{'balanced':>10}")
+    print(f"{'method':<11}{'recall@5':>10}{'nDCG@5':>9}{'artists':>9}{'samey':>8}"
+          f"{'IN':>6}{'EN':>6}{'bal':>7}")
     print("-" * 74)
 
     indian_count = sum(1 for f in files if taxonomy.get(labels[f]).name in metrics.INDIAN_VIBES)
@@ -220,8 +232,8 @@ def main():
                 else "  (by construction)" if name == "oracle"
                 else "  (given the TRUE vibe)" if name == "keyword+" else "")
         print(f"{name:<11}{100*stats['recall']:>9.1f}%{stats['ndcg']:>9.3f}"
-              f"{stats['diversity']:>8.2f}{fmt(lane_in):>10}{fmt(lane_en):>10}"
-              f"{fmt(balanced):>10}{mark}")
+              f"{stats['diversity']:>9.2f}{stats.get('samey', 0):>8.2f}"
+              f"{fmt(lane_in):>6}{fmt(lane_en):>6}{fmt(balanced):>7}{mark}")
 
     print("-" * 74)
     print(f"lane checked on {indian_count} Indian-coded and {english_count} "

@@ -63,11 +63,11 @@ learning project rather than a wiring job.
 | 4 | Teach a vision model to describe a photo's vibe | ✅ done |
 | 5 | **First working demo** — upload a photo, get songs | ✅ done |
 | 6 | Measure it properly against baselines | ✅ done |
-| 7 | Train the aesthetic classifier | 🟡 next |
+| 7 | Train the aesthetic classifier | ❌ not needed — CLIP does mood at 67% |
 | 8–9 | Train the image → music bridge | ⬜ |
-| 10 | Ranking, variety, and picking the best 15 seconds | ⬜ |
+| 10 | Ranking, variety, language filter | ✅ done |
 | 11 | The agent layer and explanations | ⬜ |
-| 12 | Deploy publicly and write it up | ⬜ |
+| 12 | Deploy publicly and write it up | 🟡 next |
 
 ---
 

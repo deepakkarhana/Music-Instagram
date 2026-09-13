@@ -153,6 +153,26 @@ def artist_diversity(method_ids, catalog_by_id):
     return len(artists) / len(method_ids)
 
 
+def sound_alike(method_ids, all_track_ids, index):
+    """How similar the returned songs are TO EACH OTHER. Lower is more varied.
+
+    The honest companion to artist diversity. Capping one song per artist
+    already scores a comfortable 1.00, but five different artists can all be
+    lo-fi beats - varied in the metadata, identical in the ear. This measures
+    the thing that number misses.
+    """
+    from src.retrieve import rerank
+
+    positions = []
+    lookup = {t: i for i, t in enumerate(all_track_ids)}
+    for track_id in method_ids:
+        if track_id in lookup:
+            positions.append(lookup[track_id])
+    if len(positions) < 2:
+        return 0.0
+    return rerank.mean_pairwise_similarity(positions, index)
+
+
 def summarise(rows):
     """Average every metric across photos. `rows` is a list of dicts.
 
