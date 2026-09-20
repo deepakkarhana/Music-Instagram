@@ -32,3 +32,7 @@ Thumbs.db
 .vscode/
 .idea/
 .serena/
+
+# The browser bundle ships base64 inside JSON, not raw binary - Hugging Face
+# rejects binary files pushed over ordinary git.
+*.i8

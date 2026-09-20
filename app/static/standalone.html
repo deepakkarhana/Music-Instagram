@@ -184,14 +184,17 @@ async function boot() {
     const [vb, sj, sv] = await Promise.all([
       fetch('data/vibes.json').then(r => r.json()),
       fetch('data/songs.json').then(r => r.json()),
-      fetch('data/songs.i8').then(r => r.arrayBuffer()),
+      fetch('data/vectors.json').then(r => r.json()),
     ]);
     vibes = vb.vibes; songs = sj;
     // Vibe vectors arrive at full precision - only 40 of them, and
     // quantising them flipped close vibe decisions in testing.
     vibeClip = Float32Array.from(vb.clip);
     vibeClap = Float32Array.from(vb.clap);
-    songVecs = dequantise(new Int8Array(sv), songs.length, DIM);
+    // Vectors arrive base64-encoded inside JSON: Hugging Face refuses raw
+    // binary files over plain git, and base64 is text, so it just travels.
+    const bytes = Uint8Array.from(atob(sv.b64), c => c.charCodeAt(0));
+    songVecs = dequantise(new Int8Array(bytes.buffer), songs.length, DIM);
     el('count').textContent = songs.length.toLocaleString();
     setStep('s1', 'done', `· ${songs.length.toLocaleString()} songs`);
     setFill(25);

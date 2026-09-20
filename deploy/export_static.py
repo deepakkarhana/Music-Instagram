@@ -97,7 +97,20 @@ def main():
 
     vectors = song_vectors[kept_rows]
     quantised = quantise(vectors)
-    quantised.tofile(os.path.join(OUT_DIR, "songs.i8"))
+
+    # Base64 inside JSON, not a raw .i8 file. Hugging Face rejects binary
+    # files pushed through ordinary git and asks for Xet or LFS instead, which
+    # means another tool to install and another thing to go wrong on a machine
+    # that is not mine. Base64 is text, so it travels as plain source.
+    #
+    # Costs 33% - 6.1 MB becomes 8.1 MB - and gzip over the wire claws most of
+    # that back, because base64 of quantised vectors compresses well.
+    import base64
+
+    encoded = base64.b64encode(quantised.tobytes()).decode("ascii")
+    with open(os.path.join(OUT_DIR, "vectors.json"), "w", encoding="utf-8") as handle:
+        json.dump({"rows": len(kept_ids), "dim": int(vectors.shape[1]),
+                   "scale": 127, "b64": encoded}, handle, separators=(",", ":"))
 
     # Short keys: this file is downloaded by every visitor, and "track_name"
     # repeated 11,870 times is a megabyte of the same word.
@@ -159,7 +172,7 @@ def main():
 
     # --------------------------------------------------------------- report
     print()
-    for name in ("songs.i8", "songs.json", "vibes.json"):
+    for name in ("vectors.json", "songs.json", "vibes.json"):
         size = os.path.getsize(os.path.join(OUT_DIR, name)) / 1e6
         print(f"  {name:<14} {size:>6.1f} MB")
     print(f"\n{len(kept_ids):,} songs exported to {OUT_DIR}")
