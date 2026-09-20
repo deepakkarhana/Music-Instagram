@@ -47,34 +47,46 @@ WESTERN_VIBES = {"old_money", "y2k", "cottagecore", "streetwear"}
 MIN_RESULTS = 5
 
 
-def wanted_lane(picked, min_score_share=0.5):
+def wanted_lane(picked):
     """Which lane the chosen vibes call for, or None to leave it alone.
 
-    `picked` is the list of (vibe, score) that CLIP produced.
+    `picked` is the list of (vibe, score) that CLIP produced, strongest first.
 
-    Only the strongest vibe votes. A photo whose top vibe is an Indian wedding
-    should get Indian music even if a weaker "golden hour" also matched; but a
-    weak Indian signal buried under a strong neutral one should not drag the
-    whole result set sideways.
+    ONLY THE TOP VIBE DECIDES, and the first version of this was wrong about
+    that in a way worth recording.
+
+    It also let a coded vibe further down trigger the filter, provided its
+    score was at least half the top score. That sounds conservative and is
+    not, because **CLIP's cosine scores sit in a narrow band**. On a real
+    photo of a concert crowd:
+
+        0.2927  Euphoric            neutral
+        0.2675  Party or club       neutral
+        0.2128  Night               neutral
+        0.2113  Snow                neutral
+        0.2021  Vintage Bollywood   indian     <- 69% of the top score
+
+    Fifth place, clearly not what the photo is about, and 0.2021/0.2927 = 0.69
+    sailed past the 0.5 threshold. The whole result set was restricted to
+    Indian music because of it.
+
+    In a band running 0.20 to 0.29, *everything* is 70-100% of the top. Ratios
+    of raw cosine scores carry almost no information - a mistake already noted
+    in `vibes_to_query_vector`, where weights are built from differences for
+    exactly this reason, and then made again here.
+
+    The top vibe alone is predictable and explicable: if the strongest thing
+    CLIP sees is an Indian wedding, restrict to Indian music. Otherwise leave
+    the results alone.
     """
     if not picked:
         return None
 
-    top_vibe, top_score = picked[0]
+    top_vibe = picked[0][0]
     if top_vibe.name in INDIAN_VIBES:
         return "indian"
     if top_vibe.name in WESTERN_VIBES:
         return "english"
-
-    # A strong coded vibe further down still counts, if it is close to the top.
-    for vibe, score in picked[1:]:
-        if top_score > 0 and score / top_score < min_score_share:
-            break
-        if vibe.name in INDIAN_VIBES:
-            return "indian"
-        if vibe.name in WESTERN_VIBES:
-            return "english"
-
     return None
 
 

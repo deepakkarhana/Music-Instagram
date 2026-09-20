@@ -3,8 +3,7 @@ title: Music for your photo
 emoji: 🎵
 colorFrom: yellow
 colorTo: gray
-sdk: docker
-app_port: 7860
+sdk: static
 pinned: false
 license: mit
 short_description: Drop in a photo, get songs that fit. CLIP reads the image, CLAP knows the music.

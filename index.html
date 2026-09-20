@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music for your photo</title>
+<style>
+  :root {
+    --ink:#f4f1ec; --ink-soft:#a39d94; --ink-faint:#6b665f;
+    --ground:#14120f; --panel:#1d1a16; --edge:#2b2721; --accent:#e0a256;
+    --scene:#7fa8c9; --time:#c9a87f; --mood:#c98fa8;
+    --occasion:#8fc99c; --aesthetic:#b49ec9;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink);
+         font:15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+         -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:940px; margin:0 auto; padding:48px 24px 80px; }
+
+  h1 { font:600 30px/1.15 ui-serif, Georgia, "Times New Roman", serif;
+       letter-spacing:-0.01em; margin:0 0 8px; }
+  .sub { color:var(--ink-soft); max-width:58ch; margin:0 0 30px; }
+  .sub b { color:var(--ink); font-weight:500; }
+
+  #boot { border:1px solid var(--edge); background:var(--panel);
+          border-radius:12px; padding:20px 22px; margin-bottom:26px; }
+  #boot h2 { font:600 12px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing:.09em;
+             text-transform:uppercase; color:var(--ink-faint); margin:0 0 12px; }
+  .step { display:flex; align-items:center; gap:10px; font-size:13.5px;
+          color:var(--ink-soft); padding:3px 0; }
+  .step .mark { width:15px; text-align:center; color:var(--ink-faint); }
+  .step.done .mark { color:#8fc99c; }
+  .step.now .mark { color:var(--accent); }
+  .step.done, .step.now { color:var(--ink); }
+  .bar { height:3px; background:var(--edge); border-radius:9px; margin-top:14px; }
+  .bar span { display:block; height:100%; width:0; background:var(--accent);
+              border-radius:9px; transition:width .25s; }
+  #boot .note { color:var(--ink-faint); font-size:12px; margin:12px 0 0; }
+
+  #drop { border:1.5px dashed var(--edge); border-radius:14px; background:var(--panel);
+          padding:44px 24px; text-align:center; cursor:pointer;
+          transition:border-color .15s, background .15s, opacity .2s; }
+  #drop.disabled { opacity:.45; pointer-events:none; }
+  #drop:hover, #drop.over { border-color:var(--accent); background:#221e19; }
+  #drop strong { display:block; font-size:16px; margin-bottom:6px; }
+  #drop span { color:var(--ink-faint); font-size:13px; }
+  #file { display:none; }
+
+  #result { display:none; margin-top:32px; }
+  .grid { display:grid; grid-template-columns:280px 1fr; gap:28px; align-items:start; }
+  @media (max-width:720px){ .grid{ grid-template-columns:1fr; } }
+  #preview { width:100%; border-radius:12px; display:block; border:1px solid var(--edge); }
+
+  h2.sec { font:600 11px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing:.1em;
+           text-transform:uppercase; color:var(--ink-faint); margin:0 0 12px; }
+  .block + .block { margin-top:26px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { display:inline-flex; align-items:baseline; gap:8px; padding:6px 11px;
+          border-radius:99px; background:#241f1a; border:1px solid var(--edge); font-size:13px; }
+  .chip .dot { width:7px; height:7px; border-radius:99px; }
+  .chip .val { color:var(--ink-faint); font-size:11px; font-variant-numeric:tabular-nums; }
+  .query { color:var(--ink-soft); font-size:13px; line-height:1.6; background:var(--panel);
+           border:1px solid var(--edge); border-radius:10px; padding:12px 14px; }
+
+  ol.songs { list-style:none; margin:0; padding:0; }
+  ol.songs li { display:grid; grid-template-columns:26px 1fr auto; gap:14px;
+                align-items:center; padding:13px 0; border-bottom:1px solid var(--edge); }
+  ol.songs li:last-child { border-bottom:none; }
+  .rank { color:var(--ink-faint); font-variant-numeric:tabular-nums; font-size:13px; }
+  .title { font-weight:500; }
+  .meta { color:var(--ink-faint); font-size:12.5px; margin-top:2px; }
+  .score { color:var(--accent); font-variant-numeric:tabular-nums; font-size:12.5px; }
+  audio { height:32px; width:180px; grid-column:1/-1; }
+  @media (max-width:560px){ audio{ width:100%; } }
+  .why { margin-top:18px; color:var(--ink-soft); font-style:italic; font-size:13.5px; }
+  .took { color:var(--ink-faint); font-size:12px; margin-top:6px; }
+  #status { margin-top:22px; color:var(--ink-soft); }
+  #status.error { color:#d98b7a; }
+
+  footer { margin-top:56px; color:var(--ink-faint); font-size:12.5px; line-height:1.75; }
+  footer b { color:var(--ink-soft); font-weight:500; }
+  footer a { color:var(--ink-soft); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Music for your photo</h1>
+  <p class="sub">
+    Drop in a photo. It works out what the photo <em>looks</em> like, decides what
+    that should <em>sound</em> like, and finds songs to match from
+    <b id="count">11,870</b> tracks. <b>Everything runs in your browser</b> — your
+    photo is never uploaded anywhere.
+  </p>
+
+  <div id="boot">
+    <h2>Getting ready</h2>
+    <div class="step" id="s1"><span class="mark">○</span><span>Song library <em id="s1n"></em></span></div>
+    <div class="step" id="s2"><span class="mark">○</span><span>Vision model <em id="s2n"></em></span></div>
+    <div class="bar"><span id="fill"></span></div>
+    <p class="note">
+      About 185 MB the first time, then cached — later visits start instantly.
+      The model is the big part, and it is what lets this run without a server.
+    </p>
+  </div>
+
+  <div id="drop" class="disabled" tabindex="0" role="button" aria-label="Choose a photo">
+    <strong>Drop a photo here</strong>
+    <span>or click to choose &nbsp;·&nbsp; JPEG, PNG or WebP</span>
+  </div>
+  <input type="file" id="file" accept="image/jpeg,image/png,image/webp">
+
+  <div id="status"></div>
+
+  <div id="result">
+    <div class="grid">
+      <img id="preview" alt="The photo you chose">
+      <div>
+        <div class="block"><h2 class="sec">What it sees</h2><div class="chips" id="vibes"></div></div>
+        <div class="block"><h2 class="sec">What it asked the music model for</h2><div class="query" id="query"></div></div>
+        <div class="block">
+          <h2 class="sec">Songs</h2>
+          <ol class="songs" id="songs"></ol>
+          <p class="why" id="why"></p>
+          <p class="took" id="took"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <b>How it works.</b> One model reads images, a different one understands music,
+    and they have never met. A vocabulary of 40 “vibes” joins them: each has a
+    description of how it <em>looks</em> and one of how it <em>sounds</em>. The photo is
+    matched on the first; the music is retrieved on the second.<br>
+    <b>Why there is no server.</b> The music model only ever describes the 40 vibes and
+    the 11,870 songs — none of which change — so all of that was computed once, in
+    advance. The only thing your photo needs is the image model, and that runs here.<br>
+    <b>Audio.</b> Previews stream directly from Apple. Nothing is stored or served here.<br>
+    <a href="https://github.com/deepakkarhana/Music-Instagram">Source and write-up on GitHub</a>
+  </footer>
+</div>
+
+<script type="module">
+import { AutoProcessor, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.1';
+import * as ORT from 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js';
+
+const AXIS_COLOUR = { scene:'var(--scene)', time:'var(--time)', mood:'var(--mood)',
+                      occasion:'var(--occasion)', aesthetic:'var(--aesthetic)' };
+const MODEL = 'Xenova/clip-vit-base-patch32';
+// fp16, not the smaller quantised build. Measured against the Python version on
+// 40 photos: fp16 reproduces the vibe choice 200/200 times, int8 only 141/200.
+// A third of the answers changing is a different product, not a smaller one.
+const WEIGHTS = `https://huggingface.co/${MODEL}/resolve/main/onnx/vision_model_fp16.onnx`;
+
+const DIM = 512, TOP_K = 5, LAMBDA = 0.7, PER_ARTIST = 1;
+
+let songVecs, songs, vibes, vibeClip, vibeClap, processor, session;
+
+const el = id => document.getElementById(id);
+const setStep = (id, state, note) => {
+  el(id).className = 'step ' + state;
+  el(id).querySelector('.mark').textContent = state === 'done' ? '✓' : (state === 'now' ? '•' : '○');
+  if (note !== undefined) el(id + 'n').textContent = note;
+};
+const setFill = pct => el('fill').style.width = pct + '%';
+
+function dequantise(int8, rows, dim) {
+  const out = new Float32Array(rows * dim);
+  for (let i = 0; i < out.length; i++) out[i] = int8[i] / 127;
+  // Re-normalise: rounding to int8 nudges each vector off unit length.
+  for (let r = 0; r < rows; r++) {
+    let sum = 0;
+    for (let d = 0; d < dim; d++) { const v = out[r*dim+d]; sum += v*v; }
+    const norm = Math.sqrt(sum) || 1;
+    for (let d = 0; d < dim; d++) out[r*dim+d] /= norm;
+  }
+  return out;
+}
+
+async function boot() {
+  try {
+    setStep('s1', 'now', '');
+    const [vb, sj, sv] = await Promise.all([
+      fetch('app/static/data/vibes.json').then(r => r.json()),
+      fetch('app/static/data/songs.json').then(r => r.json()),
+      fetch('app/static/data/songs.i8').then(r => r.arrayBuffer()),
+    ]);
+    vibes = vb.vibes; songs = sj;
+    // Vibe vectors arrive at full precision - only 40 of them, and
+    // quantising them flipped close vibe decisions in testing.
+    vibeClip = Float32Array.from(vb.clip);
+    vibeClap = Float32Array.from(vb.clap);
+    songVecs = dequantise(new Int8Array(sv), songs.length, DIM);
+    el('count').textContent = songs.length.toLocaleString();
+    setStep('s1', 'done', `· ${songs.length.toLocaleString()} songs`);
+    setFill(25);
+
+    setStep('s2', 'now', '· downloading, this is the slow part');
+    env.allowLocalModels = false;
+    processor = await AutoProcessor.from_pretrained(MODEL);
+    session = await ORT.InferenceSession.create(WEIGHTS, { executionProviders: ['wasm'] });
+    setStep('s2', 'done', '· ready');
+    setFill(100);
+
+    setTimeout(() => el('boot').style.display = 'none', 700);
+    el('drop').classList.remove('disabled');
+  } catch (error) {
+    el('status').className = 'error';
+    el('status').textContent = 'Could not start: ' + error.message;
+  }
+}
+
+async function embedPhoto(blob) {
+  const image = await RawImage.fromBlob(blob);
+  const { pixel_values } = await processor(image);
+  const input = new ORT.Tensor('float32', Float32Array.from(pixel_values.data), pixel_values.dims);
+  const output = await session.run({ pixel_values: input });
+  const raw = Object.values(output)[0].data;
+  const vec = new Float32Array(DIM);
+  let sum = 0;
+  for (let i = 0; i < DIM; i++) { vec[i] = raw[i]; sum += raw[i]*raw[i]; }
+  const norm = Math.sqrt(sum) || 1;
+  for (let i = 0; i < DIM; i++) vec[i] /= norm;
+  return vec;
+}
+
+const dot = (a, ao, b, bo, dim) => {
+  let s = 0;
+  for (let i = 0; i < dim; i++) s += a[ao+i] * b[bo+i];
+  return s;
+};
+
+function pickVibes(photo) {
+  const scores = vibes.map((v, i) => ({ vibe: v, score: dot(photo, 0, vibeClip, i*DIM, DIM), index: i }));
+  // Best on each axis, not the best few overall - a photo is a place AND a
+  // time AND a mood, and the top three overall are often three near-identical
+  // scenes. This also matches how the Python version does it.
+  const best = {};
+  for (const s of scores) {
+    if (!best[s.vibe.axis] || s.score > best[s.vibe.axis].score) best[s.vibe.axis] = s;
+  }
+  return Object.values(best).sort((a, b) => b.score - a.score);
+}
+
+function buildQuery(picked) {
+  // Weight by how much each vibe beat the weakest, not by raw score: cosine
+  // values sit in a narrow band well above zero, so using them directly would
+  // make a strong signal and a weak guess almost equally important.
+  const lowest = Math.min(...picked.map(p => p.score));
+  const weights = picked.map(p => p.score - lowest + 1e-3);
+  const total = weights.reduce((a, b) => a + b, 0);
+  const query = new Float32Array(DIM);
+  picked.forEach((p, n) => {
+    const w = weights[n] / total;
+    for (let d = 0; d < DIM; d++) query[d] += w * vibeClap[p.index*DIM + d];
+  });
+  let sum = 0;
+  for (let d = 0; d < DIM; d++) sum += query[d]*query[d];
+  const norm = Math.sqrt(sum) || 1;
+  for (let d = 0; d < DIM; d++) query[d] /= norm;
+  const describe = picked.map((p, n) =>
+    `${p.vibe.label} (${Math.round(100*weights[n]/total)}%)`).join(' + ');
+  return { query, describe };
+}
+
+function search(query, picked) {
+  const scored = new Array(songs.length);
+  for (let i = 0; i < songs.length; i++) scored[i] = { i, s: dot(query, 0, songVecs, i*DIM, DIM) };
+  scored.sort((a, b) => b.s - a.s);
+
+  // Language is metadata, not acoustics - two separate measurements said so.
+  // Same candidate pool as the Python version. The browser could afford to
+  // score all 11,870 and take hundreds, but then it would make different
+  // diversity choices from the server and the two would quietly disagree -
+  // which is exactly what happened before this was matched.
+  const lane = picked.length ? (picked[0].vibe.lane || '') : '';
+  let pool = scored.slice(0, TOP_K * (lane ? 40 : 8));
+  if (lane) {
+    const filtered = pool.filter(x => songs[x.i].l === lane);
+    if (filtered.length >= TOP_K) pool = filtered;
+  }
+
+  const seen = new Map();
+  const shortlist = [];
+  for (const cand of pool) {
+    const artist = (songs[cand.i].a || '?').toLowerCase();
+    if ((seen.get(artist) || 0) >= PER_ARTIST) continue;
+    seen.set(artist, (seen.get(artist) || 0) + 1);
+    shortlist.push(cand);
+    if (shortlist.length >= TOP_K * 6) break;
+  }
+
+  // Maximal Marginal Relevance: five different artists can still all be lo-fi.
+  const chosen = [0];
+  while (chosen.length < Math.min(TOP_K, shortlist.length)) {
+    let bestIndex = -1, bestValue = -Infinity;
+    for (let i = 0; i < shortlist.length; i++) {
+      if (chosen.includes(i)) continue;
+      let redundancy = -Infinity;
+      for (const c of chosen) {
+        redundancy = Math.max(redundancy,
+          dot(songVecs, shortlist[i].i*DIM, songVecs, shortlist[c].i*DIM, DIM));
+      }
+      const value = LAMBDA * shortlist[i].s - (1 - LAMBDA) * redundancy;
+      if (value > bestValue) { bestValue = value; bestIndex = i; }
+    }
+    if (bestIndex < 0) break;
+    chosen.push(bestIndex);
+  }
+  // MMR chooses WHICH songs; relevance chooses the order they are shown in.
+  return { picks: chosen.map(i => shortlist[i]).sort((a, b) => b.s - a.s), lane };
+}
+
+function render(blob, picked, describe, found, ms) {
+  el('preview').src = URL.createObjectURL(blob);
+  el('vibes').innerHTML = picked.map(p => `
+    <span class="chip"><span class="dot" style="background:${AXIS_COLOUR[p.vibe.axis]}"></span>
+    ${esc(p.vibe.label)}<span class="val">${p.score.toFixed(3)}</span></span>`).join('');
+  el('query').textContent = describe + (found.lane ? `  —  restricted to ${found.lane} music` : '');
+  el('songs').innerHTML = found.picks.map((p, n) => {
+    const s = songs[p.i];
+    return `<li><span class="rank">${n+1}</span>
+      <span><span class="title">${esc(s.n)}</span>
+      <div class="meta">${esc(s.a)}${s.y ? ' · ' + s.y : ''}${s.g ? ' · ' + esc(s.g) : ''}</div></span>
+      <span class="score">${p.s.toFixed(3)}</span>
+      ${s.u ? `<audio controls preload="none" src="${esc(s.u)}"></audio>` : ''}</li>`;
+  }).join('');
+  const top = picked.slice(0, 2).map(p => p.vibe.label.toLowerCase()).join(', ');
+  el('why').textContent = found.picks.length
+    ? `${songs[found.picks[0].i].n} matched the ${top} in your photo.` : '';
+  el('took').textContent = `Found in ${ms} ms, entirely on your device.`;
+  el('result').style.display = 'block';
+  el('status').textContent = '';
+}
+
+async function handle(blob) {
+  if (!blob.type.startsWith('image/')) {
+    el('status').className = 'error';
+    el('status').textContent = 'That is not an image. JPEG, PNG or WebP please.';
+    return;
+  }
+  el('status').className = '';
+  el('status').textContent = 'Looking at your photo…';
+  el('result').style.display = 'none';
+  try {
+    const started = performance.now();
+    const photo = await embedPhoto(blob);
+    const picked = pickVibes(photo);
+    const { query, describe } = buildQuery(picked);
+    const found = search(query, picked);
+    render(blob, picked, describe, found, Math.round(performance.now() - started));
+  } catch (error) {
+    el('status').className = 'error';
+    el('status').textContent = 'Could not read that photo: ' + error.message;
+  }
+}
+
+const esc = t => String(t ?? '').replace(/[&<>"']/g,
+  c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+el('drop').addEventListener('click', () => el('file').click());
+el('drop').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el('file').click(); }
+});
+el('file').addEventListener('change', () => el('file').files[0] && handle(el('file').files[0]));
+['dragenter','dragover'].forEach(n => el('drop').addEventListener(n, e => {
+  e.preventDefault(); el('drop').classList.add('over'); }));
+['dragleave','drop'].forEach(n => el('drop').addEventListener(n, e => {
+  e.preventDefault(); el('drop').classList.remove('over'); }));
+el('drop').addEventListener('drop', e => e.dataTransfer.files[0] && handle(e.dataTransfer.files[0]));
+
+boot();
+</script>
+</body>
+</html>
